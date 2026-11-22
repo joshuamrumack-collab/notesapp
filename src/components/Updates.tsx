@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { isTauri } from "../lib/storage";
+import { t } from "../lib/i18n";
 
 type Update = Awaited<ReturnType<typeof import("@tauri-apps/plugin-updater").check>>;
 type State =
@@ -39,14 +40,14 @@ export function UpdateBanner({ beforeInstall }: { beforeInstall: () => Promise<v
         setState(update ? { kind: "available", update } : { kind: "none", manual });
       } catch (e) {
         // A failed check on start-up (offline, no releases yet) is not worth interrupting anyone for.
-        setState(manual ? { kind: "error", message: `Could not check for updates: ${e instanceof Error ? e.message : String(e)}` } : { kind: "idle" });
+        setState(manual ? { kind: "error", message: t("Could not check for updates: {0}", e instanceof Error ? e.message : String(e)) } : { kind: "idle" });
       }
     };
-    const t = window.setTimeout(() => void run(false), 3000);
+    const timer = window.setTimeout(() => void run(false), 3000);
     const manual = () => void run(true);
     window.addEventListener("notesapp:check-updates", manual);
     return () => {
-      window.clearTimeout(t);
+      window.clearTimeout(timer);
       window.removeEventListener("notesapp:check-updates", manual);
     };
   }, []);
@@ -54,13 +55,13 @@ export function UpdateBanner({ beforeInstall }: { beforeInstall: () => Promise<v
   if (!isTauri) return null;
   const close = () => setState({ kind: "idle" });
 
-  if (state.kind === "checking" && state.manual) return <div className="update-bar">Checking for updates…</div>;
+  if (state.kind === "checking" && state.manual) return <div className="update-bar">{t("Checking for updates…")}</div>;
   if (state.kind === "none" && state.manual)
     return (
       <div className="update-bar">
-        You have the newest version.{" "}
+        {t("You have the newest version.")}{" "}
         <button className="quiet" onClick={close}>
-          OK
+          {t("OK")}
         </button>
       </div>
     );
@@ -69,7 +70,7 @@ export function UpdateBanner({ beforeInstall }: { beforeInstall: () => Promise<v
       <div className="update-bar error-bar">
         {state.message}{" "}
         <button className="quiet" onClick={close}>
-          OK
+          {t("OK")}
         </button>
       </div>
     );
@@ -77,7 +78,7 @@ export function UpdateBanner({ beforeInstall }: { beforeInstall: () => Promise<v
     const pct = state.total ? Math.round((state.got / state.total) * 100) : 0;
     return (
       <div className="update-bar">
-        Downloading the update… {state.total ? `${pct}%` : ""} The app restarts by itself when it is done.
+        {t("Downloading the update… {0} The app restarts by itself when it is done.", state.total ? `${pct}%` : "")}
         <progress max={100} value={pct} />
       </div>
     );
@@ -87,7 +88,7 @@ export function UpdateBanner({ beforeInstall }: { beforeInstall: () => Promise<v
     return (
       <div className="update-bar ready">
         <span>
-          <strong>Version {u.version} is available</strong> (you have {u.currentVersion}).
+          <strong>{t("Version {0} is available", u.version)}</strong> {t("(you have {0}).", u.currentVersion)}
           {u.body ? <span className="muted"> {u.body.split("\n")[0].slice(0, 140)}</span> : null}
         </span>
         <button
@@ -106,14 +107,14 @@ export function UpdateBanner({ beforeInstall }: { beforeInstall: () => Promise<v
               const { relaunch } = await import("@tauri-apps/plugin-process");
               await relaunch();
             } catch (e) {
-              setState({ kind: "error", message: `The update did not install: ${e instanceof Error ? e.message : String(e)}` });
+              setState({ kind: "error", message: t("The update did not install: {0}", e instanceof Error ? e.message : String(e)) });
             }
           }}
         >
-          Update and restart
+          {t("Update and restart")}
         </button>
         <button className="quiet" onClick={close}>
-          Later
+          {t("Later")}
         </button>
       </div>
     );

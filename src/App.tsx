@@ -41,8 +41,14 @@ import {
   pickNotebook,
   stem,
 } from "./lib/storage";
+import { t } from "./lib/i18n";
+import { LararbordetBridge } from "./components/LararbordetBridge";
+import { HistoryModal } from "./components/History";
+import { ShareSite } from "./components/ShareSite";
+import { SessionScreen } from "./components/SessionScreen";
+import { forget, snapshot } from "./lib/history";
 
-const HIDDEN = new Set(["_attachments", "_trash", "node_modules"]);
+const HIDDEN = new Set(["_attachments", "_trash", "_shared", "node_modules"]);
 const visible = (e: Entry) => !e.name.startsWith(".") && !HIDDEN.has(e.name);
 const sortDirs = (a: Entry, b: Entry) =>
   Number(a.name.startsWith("_")) - Number(b.name.startsWith("_")) || a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
@@ -58,6 +64,9 @@ type Modal =
   | { kind: "template"; template: string }
   | { kind: "lock" }
   | { kind: "theme" }
+  | { kind: "lararbordet" }
+  | { kind: "history" }
+  | { kind: "share" }
   | null;
 
 const RECENT = "notesapp.recent";
@@ -95,6 +104,12 @@ export default function App() {
   const [modal, setModal] = useState<Modal>(null);
   const [playerSafe, setPlayerSafe] = useState(false);
   const [tag, setTag] = useState("");
+  const [, setLangVer] = useState(0);
+  useEffect(() => {
+    const changed = () => setLangVer((v) => v + 1);
+    window.addEventListener("notesapp:lang", changed);
+    return () => window.removeEventListener("notesapp:lang", changed);
+  }, []);
   const [loading, setLoading] = useState("");
   const flushRef = useRef<(() => Promise<void>) | null>(null);
   const refresh = () => setTick((t) => t + 1);
@@ -103,7 +118,7 @@ export default function App() {
 
   // ---------- opening ----------
   const openNotebook = useCallback(async (s: Store) => {
-    setLoading(`Opening ${s.rootName}…`);
+    setLoading(t("Opening {0}…", s.rootName));
     try {
       const { config, exists } = await loadConfig(s);
       const empty = !exists && (await isEmptyFolder(s));
@@ -185,7 +200,7 @@ export default function App() {
 
   const createPage = async (dir: string, title: string, extension: string, content: string) => {
     if (!store) return "";
-    const name = await freeName(store, dir, cleanName(title) || "Untitled", extension);
+    const name = await freeName(store, dir, cleanName(title) || t("Untitled"), extension);
     const path = join(dir, name);
     await store.writeText(path, content);
     index.setPage(path, content);
@@ -197,7 +212,7 @@ export default function App() {
 
   const newPage = () =>
     guard(async () => {
-      const path = await createPage(section, "Untitled", "canvas", "");
+      const path = await createPage(section, t("Untitled"), "canvas", "");
       flushRef.current = null;
       setView("");
       setPage(path);
@@ -210,7 +225,7 @@ export default function App() {
       flushRef.current = null;
       setSection(dirname(path));
       setPage(path);
-      setNotice(`Created the page “${stem(path)}”.`);
+      setNotice(t("Created the page “{0}”.", stem(path)));
     });
 
   const changed = useCallback(
@@ -308,7 +323,7 @@ export default function App() {
       bump();
       setPage(to);
       refresh();
-      if (updated) setNotice(`Renamed. Updated ${updated} ${updated === 1 ? "link" : "links"} in ${linking.length} ${linking.length === 1 ? "page" : "pages"}.`);
+      if (updated) setNotice(t("Renamed. Updated {0} links in {1} pages.", updated, linking.length));
     });
 
   const deletePage = () =>
@@ -322,7 +337,7 @@ export default function App() {
       flushRef.current = null;
       setPage("");
       refresh();
-      setNotice(`Moved “${stem(page)}” to the _trash folder in this notebook.`);
+      setNotice(t("Moved “{0}” to the _trash folder in this notebook.", stem(page)));
     });
 
   const lockPage = async (password: string) => {
@@ -334,8 +349,8 @@ export default function App() {
     const to = join(dirname(page), name);
     await store.writeText(to, await lockText(content, password, kind));
     await store.remove(page);
-    // Backups made by this app would still hold the readable text.
-    let removed = 0;
+    // Backups and history made by this app would still hold the readable text.
+    let removed = await forget(store, page);
     for (const e of await store.list("_trash/backups").catch(() => [] as Entry[])) {
       if (e.name.startsWith(basename(page) + ".")) {
         await store.remove(join("_trash/backups", e.name));
@@ -351,9 +366,10 @@ export default function App() {
     setPage(to);
     refresh();
     setNotice(
-      "Page locked. It is encrypted on disk." +
-        (removed ? ` Removed ${removed} unencrypted backup${removed > 1 ? "s" : ""} of it.` : "") +
-        " Copies elsewhere (other backups, sync history) are not affected.",
+      t("Page locked. It is encrypted on disk.") +
+        (removed ? " " + t("Removed {0} unencrypted backups of it.", removed) : "") +
+        " " +
+        t("Copies elsewhere (other backups, sync history) are not affected."),
     );
   };
 
@@ -372,7 +388,7 @@ export default function App() {
       bump();
       setPage(to);
       refresh();
-      setNotice("Lock removed. The page is readable on disk again.");
+      setNotice(t("Lock removed. The page is readable on disk again."));
     });
 
   const saveSettings = async (c: NotebookConfig) => {
@@ -449,6 +465,7 @@ export default function App() {
     onSaved: (content: string) => {
       index.setPage(page, content);
       bump();
+      void snapshot(store, page, content).catch((e) => console.warn("History not saved", e));
     },
   };
 
@@ -463,18 +480,18 @@ export default function App() {
             {config.kitName && <span className="kit-name">{config.kitName}</span>}
           </div>
           <div className="finder-buttons">
-            <button onClick={() => setModal({ kind: "finder", mode: "pages" })} title="Ctrl+P">
-              Go to page
+            <button onClick={() => setModal({ kind: "finder", mode: "pages" })} title={t("Ctrl+P")}>
+              {t("Go to page")}
             </button>
-            <button onClick={() => setModal({ kind: "finder", mode: "text" })} title="Ctrl+Shift+F">
-              Search
+            <button onClick={() => setModal({ kind: "finder", mode: "text" })} title={t("Ctrl+Shift+F")}>
+              {t("Search")}
             </button>
           </div>
           <div className="tree">
-            <div className="side-label">Sections</div>
+            <div className="side-label">{t("Sections")}</div>
             <button className={"tree-row" + (section === "" && !view ? " selected" : "")} onClick={() => (setSection(""), setView(""))}>
               <span className="twisty" />
-              Loose pages
+              {t("Loose pages")}
             </button>
             <SectionTree
               store={store}
@@ -508,80 +525,94 @@ export default function App() {
             />
             {config.views.length > 0 && (
               <>
-                <div className="side-label">Views</div>
+                <div className="side-label">{t("Views")}</div>
                 {config.views.map((v) => (
                   <button key={v.id} className={"tree-row" + (view === v.id ? " selected" : "")} onClick={() => guard(async () => setView(v.id))}>
-                    <span className="twisty">{{ table: "▤", board: "▥", schedule: "▦", timeline: "┆", tree: "⑂" }[v.kind]}</span>
+                    <span className="twisty">{{ table: "▤", board: "▥", schedule: "▦", timeline: "┆", tree: "⑂", coverage: "✓", web: "✳" }[v.kind]}</span>
                     {v.name}
                   </button>
                 ))}
               </>
             )}
-            <div className="side-label">Explore</div>
+            <div className="side-label">{t("Explore")}</div>
             <button className={"tree-row" + (view === "explore:contents" ? " selected" : "")} onClick={() => guard(async () => setView("explore:contents"))}>
-              <span className="twisty">❏</span>Contents
+              <span className="twisty">❏</span>{t("Contents")}
             </button>
             <button className={"tree-row" + (view === "explore:tags" ? " selected" : "")} onClick={() => guard(async () => setView("explore:tags"))}>
-              <span className="twisty">#</span>Tags
+              <span className="twisty">#</span>{t("Tags")}
             </button>
             <button className={"tree-row" + (view === "explore:todo" ? " selected" : "")} onClick={() => guard(async () => setView("explore:todo"))}>
-              <span className="twisty">✎</span>To write
+              <span className="twisty">✎</span>{t("To write")}
               {todoCount > 0 && <span className="count">{todoCount}</span>}
             </button>
-            {config.tools.some((t) => t !== "player-safe") && <div className="side-label">Tools</div>}
+            {config.tools.some((t) => t !== "player-safe") && <div className="side-label">{t("Tools")}</div>}
             {config.tools.includes("dice") && (
               <button className={"tree-row" + (view === "tool:dice" ? " selected" : "")} onClick={() => guard(async () => setView("tool:dice"))}>
-                <span className="twisty">⚄</span>Dice
+                <span className="twisty">⚄</span>{t("Dice")}
+              </button>
+            )}
+
+            {config.tools.includes("initiative") && (
+              <button className={"tree-row" + (view === "tool:initiative" ? " selected" : "")} onClick={() => guard(async () => setView("tool:initiative"))}>
+                <span className="twisty">⚔</span>{t("Initiative")}
               </button>
             )}
             {config.tools.includes("initiative") && (
-              <button className={"tree-row" + (view === "tool:initiative" ? " selected" : "")} onClick={() => guard(async () => setView("tool:initiative"))}>
-                <span className="twisty">⚔</span>Initiative
+              <button className={"tree-row" + (view === "tool:session" ? " selected" : "")} onClick={() => guard(async () => setView("tool:session"))} title={t("Session page, initiative, dice and look-up on one screen")}>
+                <span className="twisty">▣</span>{t("Session mode")}
               </button>
             )}
             {config.tools.includes("player-safe") && (
-              <label className={"player-safe-toggle" + (playerSafe ? " on" : "")} title="Hides secret boxes, callouts, cards and pages">
+              <label className={"player-safe-toggle" + (playerSafe ? " on" : "")} title={t("Hides secret boxes, callouts, cards and pages")}>
                 <input type="checkbox" checked={playerSafe} onChange={(e) => setPlayerSafe(e.target.checked)} />
-                Player-safe {playerSafe ? "on" : "off"}
+                {playerSafe ? t("Player-safe on") : t("Player-safe off")}
               </label>
             )}
           </div>
           <div className="side-actions">
-            <button onClick={() => newSection("")}>+ Section</button>
-            <button onClick={() => newSection(section)} disabled={!section} title="New section inside the selected one">
-              + Subsection
+            <button onClick={() => newSection("")}>{t("+ Section")}</button>
+            <button onClick={() => newSection(section)} disabled={!section} title={t("New section inside the selected one")}>
+              {t("+ Subsection")}
             </button>
           </div>
           <div className="side-links">
             <button className="link" onClick={() => setModal({ kind: "settings" })}>
-              Settings
+              {t("Settings")}
             </button>
-            <button className="link" onClick={() => setModal({ kind: "onenote" })} title={canImportOneNote() ? "" : "Needs the desktop app on Windows"}>
-              Import OneNote
+            <button className="link" onClick={() => setModal({ kind: "onenote" })} title={canImportOneNote() ? "" : t("Needs the desktop app on Windows")}>
+              {t("Import OneNote")}
             </button>
-            <button className="link" onClick={() => setModal({ kind: "theme" })}>
-              Theme
+            <button className="link" onClick={() => setModal({ kind: "share" })} title={t("Export pages players or pupils may see as one web page")}>
+              {t("Share as website…")}
+            </button>
+            {config.cardTypes.some((c) => c.id === "unit") && (
+              <button className="link" onClick={() => setModal({ kind: "lararbordet" })} title={t("Bring courses in from Lärarbordet, or send one back")}>
+                {t("Lärarbordet…")}
+              </button>
+            )}
+            <button className="link" onClick={() => setModal({ kind: "theme" })} title={t("Colour theme and language")}>
+              {t("Theme")}
             </button>
             <button className="link" onClick={closeNotebook}>
-              Close
+              {t("Close")}
             </button>
           </div>
         </aside>
 
         <aside className="pages">
           <div className="page-buttons">
-            <button className="primary" onClick={newPage} title="Ctrl+N">
-              + New page
+            <button className="primary" onClick={newPage} title={t("Ctrl+N")}>
+              {t("+ New page")}
             </button>
             <select
               value=""
-              aria-label="Other kinds of page"
+              aria-label={t("Other kinds of page")}
               onChange={(e) => {
                 const v = e.target.value;
                 if (v === "kind:md" || v === "kind:map")
                   void guard(async () => {
                     const isMap = v === "kind:map";
-                    const path = await createPage(section, isMap ? "New map" : "Untitled", isMap ? "map" : "md", isMap ? serializeMap(emptyMap()) : "");
+                    const path = await createPage(section, isMap ? t("New map") : t("Untitled"), isMap ? "map" : "md", isMap ? serializeMap(emptyMap()) : "");
                     flushRef.current = null;
                     setView("");
                     setPage(path);
@@ -589,11 +620,11 @@ export default function App() {
                 else if (v) setModal({ kind: "template", template: v });
               }}
             >
-              <option value="">More…</option>
-              <option value="kind:md">Text page</option>
-              <option value="kind:map">Map</option>
+              <option value="">{t("More…")}</option>
+              <option value="kind:md">{t("Text page")}</option>
+              <option value="kind:map">{t("Map")}</option>
               {templates.length > 0 && (
-                <optgroup label="From template">
+                <optgroup label={t("From template")}>
                   {templates.map((t) => (
                     <option key={t} value={t}>
                       {stem(t)}
@@ -614,7 +645,7 @@ export default function App() {
 
         <main className="main">
           {notice && (
-            <div className="notice" onClick={() => setNotice("")} title="Click to dismiss">
+            <div className="notice" onClick={() => setNotice("")} title={t("Click to dismiss")}>
               {notice}
             </div>
           )}
@@ -624,18 +655,32 @@ export default function App() {
           {view === "explore:todo" && <ToWrite />}
           {view === "tool:dice" && <DiceRoller />}
           {view === "tool:initiative" && <Initiative />}
+          {view === "tool:session" && (
+            <SessionScreen
+              renderPage={(p) => {
+                const props = { ...pageProps, path: p, onSaved: (content: string) => (index.setPage(p, content), bump(), void snapshot(store, p, content).catch(() => {})) };
+                const k = `${p}#${reload}`;
+                return ext(p) === "canvas" ? <CanvasPage key={k} {...props} /> : ext(p) === "md" ? <MarkdownPage key={k} {...props} /> : ext(p) === "map" ? <MapPage key={k} {...props} /> : <div className="page-message">{t("This page is locked.")}</div>;
+              }}
+            />
+          )}
           {!view && page && (
             <>
               <header className="page-header">
                 <TitleInput key={page} value={stem(page)} onCommit={renamePage} />
-                <span className={"save save-" + saveState}>{{ saved: "Saved", dirty: "Editing…", saving: "Saving…", error: "Could not save" }[saveState]}</span>
+                <span className={"save save-" + saveState}>{{ saved: t("Saved"), dirty: t("Editing…"), saving: t("Saving…"), error: t("Could not save") }[saveState]}</span>
                 {["md", "canvas"].includes(ext(page)) && (
-                  <button className="quiet" onClick={() => setModal({ kind: "lock" })} title="Encrypt this page with a password">
-                    Lock
+                  <button className="quiet" onClick={() => setModal({ kind: "lock" })} title={t("Encrypt this page with a password")}>
+                    {t("Lock")}
                   </button>
                 )}
-                <button className="quiet" onClick={() => window.print()} title="Print, or save as PDF">
-                  PDF
+                {ext(page) !== "locked" && (
+                  <button className="quiet" onClick={() => setModal({ kind: "history" })} title={t("Earlier versions of this page")}>
+                    {t("History")}
+                  </button>
+                )}
+                <button className="quiet" onClick={() => window.print()} title={t("Print, or save as PDF")}>
+                  {t("PDF")}
                 </button>
                 <ConfirmButton key={"del" + page} label="Delete" onConfirm={deletePage} />
               </header>
@@ -647,7 +692,7 @@ export default function App() {
               {ext(page) !== "locked" && <Backlinks path={page} />}
             </>
           )}
-          {!view && !page && <div className="page-message">Pick a page, or create a new one. Ctrl+P jumps to any page.</div>}
+          {!view && !page && <div className="page-message">{t("Pick a page, or create a new one. Ctrl+P jumps to any page.")}</div>}
         </main>
       </div>
 
@@ -666,7 +711,7 @@ export default function App() {
       )}
       {modal?.kind === "kit" && (
         <KitPicker
-          title={modal.first ? "What is this notebook for?" : "Add a kit to this notebook"}
+          title={modal.first ? t("What is this notebook for?") : t("Add a kit to this notebook")}
           emptyFolder={modal.empty}
           allowNone={modal.first}
           onClose={() => setModal(null)}
@@ -682,6 +727,9 @@ export default function App() {
         />
       )}
       {modal?.kind === "theme" && <ThemePicker onClose={() => setModal(null)} />}
+      {modal?.kind === "share" && <ShareSite onClose={() => setModal(null)} />}
+      {modal?.kind === "history" && page && <HistoryModal path={page} onClose={() => setModal(null)} beforeRestore={async () => void (await flushRef.current?.())} />}
+      {modal?.kind === "lararbordet" && <LararbordetBridge onClose={() => setModal(null)} />}
       {modal?.kind === "settings" && <Settings onClose={() => setModal(null)} onSave={saveSettings} onAddKit={() => setModal({ kind: "kit", empty: false, first: false })} />}
       {modal?.kind === "onenote" && (
         <OneNoteImport
@@ -698,12 +746,12 @@ export default function App() {
       )}
       {modal?.kind === "template" && (
         <PromptModal
-          title={`New ${stem(modal.template)} page`}
-          fields={[{ key: "title", label: "Page name", value: "" }]}
-          submit="Create"
+          title={t("New {0} page", stem(modal.template))}
+          fields={[{ key: "title", label: t("Page name"), value: "" }]}
+          submit={t("Create")}
           onClose={() => setModal(null)}
           onSubmit={async ({ title }) => {
-            const name = cleanName(title) || "Untitled";
+            const name = cleanName(title) || t("Untitled");
             const content = fillTemplate(await store.readText(modal.template), name);
             const dir = section && section !== config.templatesFolder ? section : "";
             const path = await createPage(dir, name, ext(modal.template), content);
@@ -717,17 +765,17 @@ export default function App() {
       )}
       {modal?.kind === "lock" && (
         <PromptModal
-          title={`Lock “${stem(page)}”`}
-          note="The page is encrypted with this password (AES-256). Without the password nobody can read it, including you: there is no way to recover a forgotten password."
+          title={t("Lock “{0}”", stem(page))}
+          note={t("The page is encrypted with this password (AES-256). Without the password nobody can read it, including you: there is no way to recover a forgotten password.")}
           fields={[
-            { key: "a", label: "Password", type: "password" },
-            { key: "b", label: "Type it again", type: "password" },
+            { key: "a", label: t("Password"), type: "password" },
+            { key: "b", label: t("Type it again"), type: "password" },
           ]}
-          submit="Lock page"
+          submit={t("Lock page")}
           onClose={() => setModal(null)}
           onSubmit={async ({ a, b }) => {
-            if (a.length < 6) throw new Error("Use at least 6 characters.");
-            if (a !== b) throw new Error("The two passwords are not the same.");
+            if (a.length < 6) throw new Error(t("Use at least 6 characters."));
+            if (a !== b) throw new Error(t("The two passwords are not the same."));
             await lockPage(a);
             setModal(null);
           }}
@@ -739,7 +787,7 @@ export default function App() {
   function newSection(parent: string) {
     void guard(async () => {
       if (!store) return;
-      const name = await freeName(store, parent, "New section", "");
+      const name = await freeName(store, parent, t("New section"), "");
       await store.mkdir(join(parent, name));
       refresh();
       setView("");
@@ -756,8 +804,8 @@ function Welcome({ onOpen, loading, notice }: { onOpen: (s: Store) => void; load
   const version = useAppVersion();
   return (
     <div className="welcome">
-      <h1>Notes App</h1>
-      <p>A notebook is just a folder. Sections are subfolders, pages are files you own. Pick an empty folder to start a new notebook, or any folder (an Obsidian vault too) to open it.</p>
+      <h1>{t("DorkyNotes")}</h1>
+      <p>{t("A notebook is just a folder. Sections are subfolders, pages are files you own. Pick an empty folder to start a new notebook, or any folder (an Obsidian vault too) to open it.")}</p>
       <div className="welcome-actions">
         <button
           className="primary"
@@ -767,13 +815,13 @@ function Welcome({ onOpen, loading, notice }: { onOpen: (s: Store) => void; load
             if (s) onOpen(s);
           }}
         >
-          Open or create a notebook…
+          {t("Open or create a notebook…")}
         </button>
         <button disabled={!!loading} onClick={async () => onOpen(await makeDemo())}>
-          Try the demo campaign
+          {t("Try the demo campaign")}
         </button>
         <button className="quiet" onClick={() => setThemes(true)}>
-          Colour theme…
+          {t("Colour theme and language…")}
         </button>
       </div>
       {themes && <ThemePicker onClose={() => setThemes(false)} />}
@@ -781,7 +829,7 @@ function Welcome({ onOpen, loading, notice }: { onOpen: (s: Store) => void; load
       {notice && <p className="error">{notice}</p>}
       {recent.length > 0 && (
         <div className="recent">
-          <div className="side-label">Recent</div>
+          <div className="side-label">{t("Recent")}</div>
           {recent.map((p) => (
             <button key={p} className="link" onClick={async () => onOpen(await openFolderPath(p))}>
               {p}
@@ -789,16 +837,16 @@ function Welcome({ onOpen, loading, notice }: { onOpen: (s: Store) => void; load
           ))}
         </div>
       )}
-      {!canOpen && <p className="muted">This browser cannot open folders. Use the desktop app, Chrome or Edge.</p>}
+      {!canOpen && <p className="muted">{t("This browser cannot open folders. Use the desktop app, Chrome or Edge.")}</p>}
       {isTauri && (
         <p className="muted small">
           Version {version}{" "}
           <button className="link inline" onClick={checkForUpdates}>
-            Check for updates
+            {t("Check for updates")}
           </button>
         </p>
       )}
-      <p className="muted small">Opening an Obsidian vault works as it is. Editing a note rewrites its Markdown, and the original is kept in _trash/backups. Try it on a copy first.</p>
+      <p className="muted small">{t("Opening an Obsidian vault works as it is. Parts of a note you do not change are saved exactly as they were, and the original is kept in _trash/backups. Try it on a copy first.")}</p>
     </div>
   );
 }
@@ -855,16 +903,16 @@ function PageList(props: {
               }
             }}
             onClick={() => props.onOpen(path)}
-            title="Drag to reorder. Tab / Shift+Tab makes it a subpage."
+            title={t("Drag to reorder. Tab / Shift+Tab makes it a subpage.")}
           >
             <span className="page-title">{stem(entry.name)}</span>
-            {ext(entry.name) === "md" && <span className="tag">text</span>}
-            {ext(entry.name) === "locked" && <span className="tag">locked</span>}
-            {ext(entry.name) === "map" && <span className="tag">map</span>}
+            {ext(entry.name) === "md" && <span className="tag">{t("text")}</span>}
+            {ext(entry.name) === "locked" && <span className="tag">{t("locked")}</span>}
+            {ext(entry.name) === "map" && <span className="tag">{t("map")}</span>}
           </button>
         );
       })}
-      {props.items.length === 0 && <div className="empty">No pages here yet</div>}
+      {props.items.length === 0 && <div className="empty">{t("No pages here yet")}</div>}
     </div>
   );
 }
@@ -904,7 +952,7 @@ function SectionTree(props: TreeProps) {
         return (
           <div key={d.name}>
             <div className={"tree-row" + (selected === path ? " selected" : "")} style={{ paddingLeft: 8 + depth * 14 }}>
-              <button className="twisty" onClick={() => setOpen((o) => ({ ...o, [d.name]: !isOpen }))} aria-label={`Expand ${d.name}`}>
+              <button className="twisty" onClick={() => setOpen((o) => ({ ...o, [d.name]: !isOpen }))} aria-label={t("Expand {0}", d.name)}>
                 {isOpen ? "▾" : "▸"}
               </button>
               {editing === d.name ? (
@@ -917,7 +965,7 @@ function SectionTree(props: TreeProps) {
                   }}
                 />
               ) : (
-                <button className="tree-label" onClick={() => onSelect(path)} onDoubleClick={() => setEditing(d.name)} title="Double-click to rename">
+                <button className="tree-label" onClick={() => onSelect(path)} onDoubleClick={() => setEditing(d.name)} title={t("Double-click to rename")}>
                   {d.name}
                 </button>
               )}
@@ -937,7 +985,7 @@ function TitleInput({ value, onCommit, autoFocus }: { value: string; onCommit: (
       className="title-input"
       value={text}
       autoFocus={autoFocus}
-      aria-label="Name"
+      aria-label={t("Name")}
       onChange={(e) => setText(e.target.value)}
       onBlur={() => onCommit(text)}
       onKeyDown={(e) => {
@@ -955,7 +1003,7 @@ function ConfirmButton({ label, onConfirm }: { label: string; onConfirm: () => v
   const [armed, setArmed] = useState(false);
   return (
     <button className={armed ? "danger" : "quiet"} onClick={() => (armed ? onConfirm() : setArmed(true))} onBlur={() => setArmed(false)}>
-      {armed ? "Really delete?" : label}
+      {armed ? t("Really delete?") : label}
     </button>
   );
 }
@@ -971,7 +1019,7 @@ function OnMaps({ path }: { path: string }) {
   if (!maps.length) return null;
   return (
     <div className="on-maps small">
-      On the map:{" "}
+      {t("On the map:")}{" "}
       {maps.map((m, i) => (
         <span key={m}>
           {i > 0 && ", "}

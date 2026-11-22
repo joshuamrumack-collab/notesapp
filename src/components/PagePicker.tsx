@@ -3,6 +3,7 @@ import { useNB } from "../context";
 import { newCardText } from "../lib/cards";
 import { bridge } from "../lib/bridge";
 import { dirname } from "../lib/storage";
+import { t } from "../lib/i18n";
 
 interface Option {
   path: string;
@@ -50,12 +51,12 @@ export function PagePicker(props: {
         .filter((c) => (seen.has(c.path) ? false : (seen.add(c.path), true)))
         .sort((a, b) => a.title.localeCompare(b.title))
         .slice(0, 40)
-        .map((c) => ({ path: c.path, title: c.title, where: dirname(c.path) || "Loose pages" }));
+        .map((c) => ({ path: c.path, title: c.title, where: dirname(c.path) || t("Loose pages") }));
     }
     return nb.index
       .findTitles(needle, 40)
       .filter((p) => !(nb.playerSafe && p.secret) && !p.path.startsWith(nb.config.templatesFolder + "/"))
-      .map((p) => ({ path: p.path, title: p.title, where: dirname(p.path) || "Loose pages" }));
+      .map((p) => ({ path: p.path, title: p.title, where: dirname(p.path) || t("Loose pages") }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, anyPage, props.cardType, nb.indexVer, nb.playerSafe]);
 
@@ -97,7 +98,7 @@ export function PagePicker(props: {
       <input
         autoFocus
         className="picker-input"
-        placeholder={type && !anyPage ? `Find a ${type.name.toLowerCase()}…` : "Find a page…"}
+        placeholder={type && !anyPage ? t("Find a {0}…", type.name.toLowerCase()) : t("Find a page…")}
         value={q}
         onChange={(e) => {
           setQ(e.target.value);
@@ -136,7 +137,7 @@ export function PagePicker(props: {
             + New map “{q.trim()}”
           </button>
         )}
-        {!total && <div className="empty">{type && !anyPage ? `No ${type.name} cards yet. Type a name to make one.` : "No pages found"}</div>}
+        {!total && <div className="empty">{type && !anyPage ? t("No {0} cards yet. Type a name to make one.", type.name) : t("No pages found")}</div>}
       </div>
       <div className="picker-foot">
         {props.cardType && (
@@ -146,7 +147,7 @@ export function PagePicker(props: {
         )}
         {props.onClear && (
           <button className="quiet small" onClick={props.onClear}>
-            Remove link
+            {t("Remove link")}
           </button>
         )}
       </div>
@@ -180,9 +181,9 @@ export function LinkButton({ onPicked }: { onPicked: (path: string) => void }) {
       <button
         onMouseDown={(e) => e.preventDefault() /* keep the cursor where it is in the text */}
         onClick={() => setOpen(!open)}
-        title="Link to another page (Ctrl+K). Select text first to turn it into a link."
+        title={t("Link to another page (Ctrl+K). Select text first to turn it into a link.")}
       >
-        🔗 Link to page
+        {t("🔗 Link to page")}
       </button>
       {open && (
         <PagePicker

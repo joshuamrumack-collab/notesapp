@@ -4,6 +4,7 @@ import { bridge } from "../lib/bridge";
 import { isScalar } from "../lib/frontmatter";
 import { linkLabel } from "../lib/links";
 import { dirname } from "../lib/storage";
+import { t } from "../lib/i18n";
 
 interface Shown {
   target: string;
@@ -94,7 +95,7 @@ export function HoverPreview() {
     return (
       <div className="preview" style={style}>
         <strong>{shown.target}</strong>
-        <p className="muted">Not written yet. Click the link to create the page.</p>
+        <p className="muted">{t("Not written yet. Click the link to create the page.")}</p>
       </div>
     );
   }
@@ -115,11 +116,11 @@ export function HoverPreview() {
       <div className="preview-head">
         <strong>{card?.title ?? page.title}</strong>
         {type && <span className="card-label">{type.name}</span>}
-        {page.ext === "map" && <span className="card-label">Map</span>}
+        {page.ext === "map" && <span className="card-label">{t("Map")}</span>}
       </div>
-      <div className="muted small">{dirname(page.path) || "Loose pages"}</div>
+      <div className="muted small">{dirname(page.path) || t("Loose pages")}</div>
       {hidden ? (
-        <p className="muted">Secret page (hidden in player-safe mode).</p>
+        <p className="muted">{t("Secret page (hidden in player-safe mode).")}</p>
       ) : (
         <>
           {facts.length > 0 && (

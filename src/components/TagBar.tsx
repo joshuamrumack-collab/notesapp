@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNB } from "../context";
+import { t, t as tr } from "../lib/i18n";
 
 /** Tags for the whole page. Click a tag to see every page with it. */
 export function TagBar({ tags, onChange }: { tags: string[]; onChange: (tags: string[]) => void }) {
@@ -23,7 +24,7 @@ export function TagBar({ tags, onChange }: { tags: string[]; onChange: (tags: st
           <button type="button" className="link" onClick={() => nb.openTag(t)}>
             #{t}
           </button>
-          <button type="button" className="chip-x" aria-label={`Remove tag ${t}`} onClick={() => onChange(tags.filter((x) => x !== t))}>
+          <button type="button" className="chip-x" aria-label={tr("Remove tag {0}", t)} onClick={() => onChange(tags.filter((x) => x !== t))}>
             ×
           </button>
         </span>
@@ -34,7 +35,7 @@ export function TagBar({ tags, onChange }: { tags: string[]; onChange: (tags: st
             autoFocus
             className="tag-input"
             list="known-tags"
-            placeholder="tag"
+            placeholder={t("tag")}
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
@@ -56,7 +57,7 @@ export function TagBar({ tags, onChange }: { tags: string[]; onChange: (tags: st
         </>
       ) : (
         <button type="button" className="quiet small" onClick={() => setAdding(true)}>
-          + Tag
+          {t("+ Tag")}
         </button>
       )}
     </div>

@@ -3,6 +3,7 @@ import { EditorContent, useEditor } from "@tiptap/react";
 import type { Editor } from "@tiptap/core";
 import { bridge } from "../lib/bridge";
 import { editorExtensions, getMarkdown } from "../lib/md";
+import { getLang } from "../lib/i18n";
 
 interface Props {
   initial: string;
@@ -22,14 +23,22 @@ export function RichText({ initial, autoFocus, onChange, onBlur, onFocus, editor
     extensions: editorExtensions,
     content: start,
     contentType: "markdown",
+    // Spell checking in the interface language (Windows uses its own dictionaries for this).
+    editorProps: { attributes: { spellcheck: "true", lang: getLang() === "sv" ? "sv-SE" : "en" } },
     onUpdate: ({ editor }) => cb.current.onChange(getMarkdown(editor)),
     onBlur: ({ editor }) => cb.current.onBlur?.(editor.isEmpty),
     onFocus: ({ editor }) => {
-      bridge.activeEditor = editor;
+      if (bridge.activeEditor !== editor) {
+        bridge.activeEditor = editor;
+        window.dispatchEvent(new Event("notesapp:editor"));
+      }
       cb.current.onFocus?.();
     },
     onDestroy: () => {
-      if (bridge.activeEditor?.isDestroyed) bridge.activeEditor = null;
+      if (bridge.activeEditor?.isDestroyed) {
+        bridge.activeEditor = null;
+        window.dispatchEvent(new Event("notesapp:editor"));
+      }
     },
   });
   if (editorRef) editorRef.current = editor;

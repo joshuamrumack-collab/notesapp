@@ -5,12 +5,13 @@ import { type NotebookConfig, exportKit, rememberKit } from "../lib/notebook";
 import { Modal } from "./Modal";
 import { checkForUpdates, useAppVersion } from "./Updates";
 import { isTauri } from "../lib/storage";
+import { t } from "../lib/i18n";
 
-const FIELD_TYPES: FieldType[] = ["text", "number", "select", "date", "long", "check", "link", "links"];
+const FIELD_TYPES: FieldType[] = ["text", "number", "select", "date", "long", "check", "link", "links", "lgr22"];
 const TOOLS: { id: ToolId; label: string }[] = [
-  { id: "dice", label: "Dice roller" },
-  { id: "initiative", label: "Initiative tracker" },
-  { id: "player-safe", label: "Player-safe mode" },
+  { id: "dice", label: t("Dice roller") },
+  { id: "initiative", label: t("Initiative tracker") },
+  { id: "player-safe", label: t("Player-safe mode") },
 ];
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
@@ -30,11 +31,11 @@ export function Settings({ onClose, onSave, onAddKit }: { onClose: () => void; o
   const setView = (vi: number, p: Partial<ViewDef>) => setC({ ...c, views: c.views.map((v, i) => (i === vi ? { ...v, ...p } : v)) });
 
   return (
-    <Modal title="Notebook settings" onClose={onClose} wide>
+    <Modal title={t("Notebook settings")} onClose={onClose} wide>
       <div className="tabs">
-        {(["cards", "views", "general", "share"] as const).map((t) => (
-          <button key={t} className={tab === t ? "selected" : ""} onClick={() => setTab(t)}>
-            {{ cards: "Card types", views: "Views", general: "Kit and tools", share: "Save as kit" }[t]}
+        {(["cards", "views", "general", "share"] as const).map((id) => (
+          <button key={id} className={tab === id ? "selected" : ""} onClick={() => setTab(id)}>
+            {{ cards: t("Card types"), views: t("Views"), general: t("Kit and tools"), share: t("Save as kit") }[id]}
           </button>
         ))}
       </div>
@@ -51,36 +52,36 @@ export function Settings({ onClose, onSave, onAddKit }: { onClose: () => void; o
             <button
               onClick={() => {
                 const n = c.cardTypes.length + 1;
-                setC({ ...c, cardTypes: [...c.cardTypes, { id: `card-${n}`, name: `New card ${n}`, color: "#4a6fa5", fields: [{ key: "name", label: "Name", type: "text" }] }] });
+                setC({ ...c, cardTypes: [...c.cardTypes, { id: `card-${n}`, name: t("New card {0}", n), color: "#4a6fa5", fields: [{ key: "name", label: "Name", type: "text" }] }] });
                 setTypeIdx(c.cardTypes.length);
               }}
             >
-              + Card type
+              {t("+ Card type")}
             </button>
           </div>
           {type ? (
             <div className="type-edit form">
               <div className="row">
                 <label>
-                  Name
+                  {t("Name")}
                   <input value={type.name} onChange={(e) => setType({ name: e.target.value })} />
                 </label>
                 <label>
-                  Id (used in files)
+                  {t("Id (used in files)")}
                   <input value={type.id} onChange={(e) => setType({ id: slug(e.target.value) })} />
                 </label>
                 <label>
-                  Colour
+                  {t("Colour")}
                   <input type="color" value={type.color} onChange={(e) => setType({ color: e.target.value })} />
                 </label>
               </div>
               <table className="field-table">
                 <thead>
                   <tr>
-                    <th>Label</th>
-                    <th>Key</th>
-                    <th>Type</th>
-                    <th>Choices / links to</th>
+                    <th>{t("Label")}</th>
+                    <th>{t("Key")}</th>
+                    <th>{t("Type")}</th>
+                    <th>{t("Choices / links to")}</th>
                     <th />
                   </tr>
                 </thead>
@@ -102,8 +103,8 @@ export function Settings({ onClose, onSave, onAddKit }: { onClose: () => void; o
                       </td>
                       <td>
                         {(f.type === "link" || f.type === "links") && (
-                          <select value={f.target ?? ""} onChange={(e) => setField(i, { target: e.target.value })} aria-label="Links to">
-                            <option value="">Any page</option>
+                          <select value={f.target ?? ""} onChange={(e) => setField(i, { target: e.target.value })} aria-label={t("Links to")}>
+                            <option value="">{t("Any page")}</option>
                             {c.cardTypes.map((t) => (
                               <option key={t.id} value={t.id}>
                                 {t.name} cards
@@ -119,7 +120,7 @@ export function Settings({ onClose, onSave, onAddKit }: { onClose: () => void; o
                         )}
                       </td>
                       <td>
-                        <button className="quiet" onClick={() => setType({ fields: type.fields.filter((_, j) => j !== i) })} aria-label="Remove field">
+                        <button className="quiet" onClick={() => setType({ fields: type.fields.filter((_, j) => j !== i) })} aria-label={t("Remove field")}>
                           ×
                         </button>
                       </td>
@@ -128,7 +129,7 @@ export function Settings({ onClose, onSave, onAddKit }: { onClose: () => void; o
                 </tbody>
               </table>
               <div className="form-actions left">
-                <button onClick={() => setType({ fields: [...type.fields, { key: `field${type.fields.length + 1}`, label: "New field", type: "text" }] })}>+ Field</button>
+                <button onClick={() => setType({ fields: [...type.fields, { key: `field${type.fields.length + 1}`, label: t("New field"), type: "text" }] })}>{t("+ Field")}</button>
                 <button
                   className="quiet"
                   onClick={() => {
@@ -136,13 +137,13 @@ export function Settings({ onClose, onSave, onAddKit }: { onClose: () => void; o
                     setTypeIdx(0);
                   }}
                 >
-                  Delete card type
+                  {t("Delete card type")}
                 </button>
               </div>
-              <p className="muted small">Existing cards keep their values. Removing a field only hides it from the form; the value stays in the file.</p>
+              <p className="muted small">{t("Existing cards keep their values. Removing a field only hides it from the form; the value stays in the file.")}</p>
             </div>
           ) : (
-            <p className="muted">No card types yet. Add one, or add a kit under “Kit and tools”.</p>
+            <p className="muted">{t("No card types yet. Add one, or add a kit under “Kit and tools”.")}</p>
           )}
         </div>
       )}
@@ -152,10 +153,10 @@ export function Settings({ onClose, onSave, onAddKit }: { onClose: () => void; o
           <table className="field-table">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Card type</th>
-                <th>Kind</th>
-                <th>Group by / date field</th>
+                <th>{t("Name")}</th>
+                <th>{t("Card type")}</th>
+                <th>{t("Kind")}</th>
+                <th>{t("Group by / date field")}</th>
                 <th />
               </tr>
             </thead>
@@ -169,7 +170,7 @@ export function Settings({ onClose, onSave, onAddKit }: { onClose: () => void; o
                     </td>
                     <td>
                       <select value={v.cardType} onChange={(e) => setView(i, { cardType: e.target.value })}>
-                        {v.kind === "timeline" && <option value="*">Any card</option>}
+                        {v.kind === "timeline" && <option value="*">{t("Any card")}</option>}
                         {c.cardTypes.map((t) => (
                           <option key={t.id} value={t.id}>
                             {t.name}
@@ -179,21 +180,23 @@ export function Settings({ onClose, onSave, onAddKit }: { onClose: () => void; o
                     </td>
                     <td>
                       <select value={v.kind} onChange={(e) => setView(i, { kind: e.target.value as ViewKind })}>
-                        <option value="table">Table</option>
-                        <option value="board">Board</option>
-                        <option value="schedule">Schedule</option>
-                        <option value="timeline">Timeline</option>
-                        <option value="tree">Family tree</option>
+                        <option value="table">{t("Table")}</option>
+                        <option value="board">{t("Board")}</option>
+                        <option value="schedule">{t("Schedule")}</option>
+                        <option value="timeline">{t("Timeline")}</option>
+                        <option value="tree">{t("Family tree")}</option>
+                        <option value="coverage">{t("Lgr22 coverage")}</option>
+                        <option value="web">{t("Relationship web")}</option>
                       </select>
                     </td>
                     <td>
                       {v.kind !== "table" && (
-                        <select value={v.field ?? ""} onChange={(e) => setView(i, { field: e.target.value })} aria-label={v.kind === "tree" ? "Parents field" : "Field"}>
-                          <option value="">{v.kind === "tree" ? "Parents…" : v.kind === "timeline" ? "When…" : "–"}</option>
+                        <select value={v.field ?? ""} onChange={(e) => setView(i, { field: e.target.value })} aria-label={v.kind === "tree" ? t("Parents field") : t("Field")}>
+                          <option value="">{v.kind === "tree" ? t("Parents…") : v.kind === "timeline" ? t("When…") : "–"}</option>
                           {(v.cardType === "*" ? c.cardTypes.flatMap((t) => t.fields) : (vt?.fields ?? []))
                             .filter((f, j, all) => all.findIndex((x) => x.key === f.key) === j)
                             .filter((f) =>
-                              v.kind === "schedule" ? f.type === "date" : v.kind === "tree" ? f.type === "links" || f.type === "link" : v.kind === "timeline" ? ["number", "date", "text"].includes(f.type) : f.type !== "long",
+                              v.kind === "schedule" ? f.type === "date" : v.kind === "coverage" ? f.type === "lgr22" : v.kind === "web" ? f.type === "links" || f.type === "link" : v.kind === "tree" ? f.type === "links" || f.type === "link" : v.kind === "timeline" ? ["number", "date", "text"].includes(f.type) : f.type !== "long",
                             )
                             .map((f) => (
                               <option key={f.key} value={f.key}>
@@ -202,12 +205,12 @@ export function Settings({ onClose, onSave, onAddKit }: { onClose: () => void; o
                             ))}
                         </select>
                       )}
-                      {(v.kind === "tree" || v.kind === "timeline") && (
-                        <select value={v.field2 ?? ""} onChange={(e) => setView(i, { field2: e.target.value || undefined })} aria-label={v.kind === "tree" ? "Partner field" : "Era field"}>
-                          <option value="">{v.kind === "tree" ? "Partner…" : "Era…"}</option>
+                      {(v.kind === "tree" || v.kind === "timeline" || v.kind === "web") && (
+                        <select value={v.field2 ?? ""} onChange={(e) => setView(i, { field2: e.target.value || undefined })} aria-label={v.kind === "tree" ? t("Partner field") : v.kind === "web" ? t("Enemies field") : t("Era field")}>
+                          <option value="">{v.kind === "tree" ? t("Partner…") : v.kind === "web" ? t("Enemies…") : t("Era…")}</option>
                           {(v.cardType === "*" ? c.cardTypes.flatMap((t) => t.fields) : (vt?.fields ?? []))
                             .filter((f, j, all) => all.findIndex((x) => x.key === f.key) === j)
-                            .filter((f) => (v.kind === "tree" ? f.type === "links" || f.type === "link" : f.type === "text" || f.type === "select"))
+                            .filter((f) => (v.kind === "tree" || v.kind === "web" ? f.type === "links" || f.type === "link" : f.type === "text" || f.type === "select"))
                             .map((f) => (
                               <option key={f.key} value={f.key}>
                                 {f.label}
@@ -217,7 +220,7 @@ export function Settings({ onClose, onSave, onAddKit }: { onClose: () => void; o
                       )}
                     </td>
                     <td>
-                      <button className="quiet" onClick={() => setC({ ...c, views: c.views.filter((_, j) => j !== i) })} aria-label="Remove view">
+                      <button className="quiet" onClick={() => setC({ ...c, views: c.views.filter((_, j) => j !== i) })} aria-label={t("Remove view")}>
                         ×
                       </button>
                     </td>
@@ -231,7 +234,7 @@ export function Settings({ onClose, onSave, onAddKit }: { onClose: () => void; o
               disabled={!c.cardTypes.length}
               onClick={() => setC({ ...c, views: [...c.views, { id: `view-${Date.now()}`, name: "New view", cardType: c.cardTypes[0].id, kind: "table" }] })}
             >
-              + View
+              {t("+ View")}
             </button>
           </div>
         </div>
@@ -248,10 +251,10 @@ export function Settings({ onClose, onSave, onAddKit }: { onClose: () => void; o
               onAddKit();
             }}
           >
-            Add a kit to this notebook…
+            {t("Add a kit to this notebook…")}
           </button>
           <fieldset>
-            <legend>Tools</legend>
+            <legend>{t("Tools")}</legend>
             {TOOLS.map((t) => (
               <label key={t.id} className="check">
                 <input
@@ -264,20 +267,20 @@ export function Settings({ onClose, onSave, onAddKit }: { onClose: () => void; o
             ))}
           </fieldset>
           <label>
-            Templates folder
+            {t("Templates folder")}
             <input value={c.templatesFolder} onChange={(e) => setC({ ...c, templatesFolder: e.target.value.replace(/^\/+|\/+$/g, "") })} />
           </label>
-          <p className="muted small">Settings are stored in the hidden .notesapp folder inside the notebook.</p>
+          <p className="muted small">{t("Settings are stored in the hidden .notesapp folder inside the notebook.")}</p>
           {isTauri && (
             <p>
-              Notes App version {version}{" "}
+              DorkyNotes version {version}{" "}
               <button
                 onClick={() => {
                   onClose();
                   checkForUpdates();
                 }}
               >
-                Check for updates
+                {t("Check for updates")}
               </button>
             </p>
           )}
@@ -286,13 +289,13 @@ export function Settings({ onClose, onSave, onAddKit }: { onClose: () => void; o
 
       {tab === "share" && (
         <div className="form">
-          <p>Save this notebook's card types, views, tools, section names and templates as a kit file. Your pages are not included.</p>
+          <p>{t("Save this notebook's card types, views, tools, section names and templates as a kit file. Your pages are not included.")}</p>
           <label>
-            Kit name
+            {t("Kit name")}
             <input value={kitName} onChange={(e) => setKitName(e.target.value)} />
           </label>
           <label>
-            Description
+            {t("Description")}
             <input value={kitDesc} onChange={(e) => setKitDesc(e.target.value)} />
           </label>
           <div className="form-actions left">
@@ -303,13 +306,13 @@ export function Settings({ onClose, onSave, onAddKit }: { onClose: () => void; o
                   const { path, kit } = await exportKit(nb.store, c, kitName, kitDesc);
                   rememberKit(kit);
                   nb.changed(path);
-                  setMsg(`Saved as “${path}” in the notebook folder. It is also offered when you make a new notebook on this computer.`);
+                  setMsg(t("Saved as “{0}” in the notebook folder. It is also offered when you make a new notebook on this computer.", path));
                 } catch (e) {
                   setMsg(e instanceof Error ? e.message : String(e));
                 }
               }}
             >
-              Save kit file
+              {t("Save kit file")}
             </button>
           </div>
           {msg && <p>{msg}</p>}
@@ -317,7 +320,7 @@ export function Settings({ onClose, onSave, onAddKit }: { onClose: () => void; o
       )}
 
       <div className="form-actions">
-        <button onClick={onClose}>Cancel</button>
+        <button onClick={onClose}>{t("Cancel")}</button>
         <button
           className="primary"
           onClick={async () => {
@@ -325,7 +328,7 @@ export function Settings({ onClose, onSave, onAddKit }: { onClose: () => void; o
             onClose();
           }}
         >
-          Save settings
+          {t("Save settings")}
         </button>
       </div>
     </Modal>

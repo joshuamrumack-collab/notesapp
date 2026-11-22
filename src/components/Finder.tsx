@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useNB } from "../context";
 import { dirname } from "../lib/storage";
 import { Modal } from "./Modal";
+import { t } from "../lib/i18n";
 
 /** Ctrl+P jumps to a page by name; Ctrl+Shift+F searches the text of every page. */
 export function Finder({ mode, onClose, onCreate }: { mode: "pages" | "text"; onClose: () => void; onCreate: (name: string) => void }) {
@@ -21,11 +22,11 @@ export function Finder({ mode, onClose, onCreate }: { mode: "pages" | "text"; on
     onClose();
   };
   return (
-    <Modal title={mode === "pages" ? "Go to page" : "Search all pages"} onClose={onClose} wide={mode === "text"}>
+    <Modal title={mode === "pages" ? t("Go to page") : t("Search all pages")} onClose={onClose} wide={mode === "text"}>
       <input
         className="finder-input"
         autoFocus
-        placeholder={mode === "pages" ? "Page name…" : "Words to find…"}
+        placeholder={mode === "pages" ? t("Page name…") : t("Words to find…")}
         value={q}
         onChange={(e) => {
           setQ(e.target.value);
@@ -48,16 +49,16 @@ export function Finder({ mode, onClose, onCreate }: { mode: "pages" | "text"; on
         {results.map((r, i) => (
           <button key={r.path} className={"finder-row" + (i === active ? " active" : "")} onMouseEnter={() => setActive(i)} onClick={() => choose(i)}>
             <span className="finder-title">{r.title}</span>
-            <span className="finder-path">{dirname(r.path) || "Loose pages"}</span>
+            <span className="finder-path">{dirname(r.path) || t("Loose pages")}</span>
             {r.snippet && <span className="finder-snippet">{r.snippet}</span>}
           </button>
         ))}
         {canCreate && (
           <button className={"finder-row" + (active === results.length ? " active" : "")} onClick={() => choose(results.length)}>
-            <span className="finder-title">Create page “{q.trim()}”</span>
+            <span className="finder-title">{t("Create page “{0}”", q.trim())}</span>
           </button>
         )}
-        {!total && q && <div className="empty">Nothing found</div>}
+        {!total && q && <div className="empty">{t("Nothing found")}</div>}
       </div>
     </Modal>
   );
@@ -75,14 +76,14 @@ export function Backlinks({ path }: { path: string }) {
   return (
     <div className={"backlinks" + (open ? " open" : "")}>
       <button className="quiet" onClick={() => setOpen(!open)}>
-        {open ? "▾" : "▸"} Linked from {links.length} {links.length === 1 ? "page" : "pages"}
+        {open ? "▾" : "▸"} {links.length === 1 ? t("Linked from 1 page") : t("Linked from {0} pages", links.length)}
       </button>
       {open && (
         <div className="backlink-list">
           {links.map((p) => (
             <button key={p} className="link" onClick={() => nb.openPath(p)}>
               {nb.index.pages.get(p)?.title ?? p}
-              <span className="muted"> · {dirname(p) || "Loose pages"}</span>
+              <span className="muted"> · {dirname(p) || t("Loose pages")}</span>
             </button>
           ))}
         </div>

@@ -1,5 +1,5 @@
 // Notebook types ("kits"): starter sections, card types, views, templates and tools.
-export type FieldType = "text" | "number" | "select" | "date" | "long" | "check" | "link" | "links";
+export type FieldType = "text" | "number" | "select" | "date" | "long" | "check" | "link" | "links" | "lgr22";
 export interface FieldDef {
   key: string;
   label: string;
@@ -15,7 +15,7 @@ export interface CardType {
   fields: FieldDef[];
   body?: string;
 }
-export type ViewKind = "table" | "board" | "schedule" | "timeline" | "tree";
+export type ViewKind = "table" | "board" | "schedule" | "timeline" | "tree" | "coverage" | "web";
 export interface ViewDef {
   id: string;
   name: string;
@@ -148,6 +148,8 @@ const dungeonMaster: Kit = {
         f("initiative", "Init", "number"),
         links("parents", "Parents", "npc"),
         links("partner", "Partner", "npc"),
+        links("allies", "Allies", ""),
+        links("enemies", "Enemies", ""),
         f("born", "Born (year)", "number"),
         f("secret", "Secret from players", "check"),
       ],
@@ -213,6 +215,7 @@ const dungeonMaster: Kit = {
     { id: "sessions", name: "Session calendar", cardType: "session", kind: "schedule", field: "date" },
     { id: "timeline", name: "World timeline", cardType: "event", kind: "timeline", field: "year", field2: "era" },
     { id: "family", name: "Family tree", cardType: "npc", kind: "tree", field: "parents", field2: "partner" },
+    { id: "relations", name: "Relationship web", cardType: "npc", kind: "web", field: "allies", field2: "enemies" },
   ],
   templates: [
     { name: "NPC", ext: "md", content: "---\ncard: npc\nname: {{title}}\nrace: Human\nclass: \nlevel: 1\nattitude: Neutral\n---\n\n# {{title}}\n\n" + statBlock },
@@ -245,9 +248,24 @@ const teacher: Kit = {
   format: "notesapp-kit",
   id: "teacher",
   name: "Teacher planning",
-  description: "Lessons, classes and pupil notes, with a week plan and a list per class. Pupil notes can be locked with a password.",
-  sections: ["Lessons", "Classes", "Pupils", "Resources"],
+  description: "Work units and lessons linked to Lgr22 central content, a coverage view, a week plan and pupil notes. Works together with Lärarbordet.",
+  sections: ["Units", "Lessons", "Classes", "Pupils", "Resources"],
   cardTypes: [
+    {
+      id: "unit",
+      name: "Work unit",
+      color: "#2b6cb0",
+      fields: [
+        f("title", "Work unit"),
+        f("course", "Course"),
+        f("class", "Class"),
+        f("start", "Start", "date"),
+        f("end", "End", "date"),
+        f("status", "Status", "select", ["Planned", "In progress", "Done", "Assessed"]),
+        f("content", "Central content", "lgr22"),
+      ],
+      body: "## Aim\n\n\n## What we do\n\n\n## Assessment\n\n",
+    },
     {
       id: "lesson",
       name: "Lesson",
@@ -258,6 +276,8 @@ const teacher: Kit = {
         f("class", "Class"),
         f("subject", "Subject"),
         f("status", "Status", "select", ["Planned", "Done", "Moved", "Cancelled"]),
+        { key: "unit", label: "Work unit", type: "link", target: "unit" },
+        f("content", "Central content", "lgr22"),
         f("goal", "Goal", "long"),
         f("materials", "Materials", "long"),
       ],
@@ -282,17 +302,21 @@ const teacher: Kit = {
     },
   ],
   views: [
+    { id: "units", name: "Work units", cardType: "unit", kind: "board", field: "status" },
+    { id: "coverage", name: "Lgr22 coverage", cardType: "unit", kind: "coverage", field: "content" },
+    { id: "lesson-coverage", name: "Lgr22 in lessons", cardType: "lesson", kind: "coverage", field: "content" },
     { id: "week", name: "Week plan", cardType: "lesson", kind: "schedule", field: "date" },
     { id: "by-class", name: "Lessons by class", cardType: "lesson", kind: "board", field: "class" },
     { id: "pupil-notes", name: "Notes per pupil", cardType: "pupil-note", kind: "board", field: "pupil" },
     { id: "assessments", name: "Assessments", cardType: "assessment", kind: "table" },
   ],
   templates: [
+    { name: "Work unit", ext: "md", content: "---\ncard: unit\ntitle: {{title}}\ncourse: \nclass: \nstart: {{date}}\nend: \nstatus: Planned\ncontent: []\n---\n\n## Aim\n\n\n## What we do\n\n\n## Assessment\n\n" },
     { name: "Lesson", ext: "md", content: "---\ncard: lesson\ntitle: {{title}}\ndate: {{date}}\nclass: \nsubject: \nstatus: Planned\n---\n\n## Start\n\n\n## Main part\n\n\n## Ending\n\n\n## Follow-up\n\n" },
     { name: "Pupil note", ext: "md", content: "---\ncard: pupil-note\npupil: {{title}}\nclass: \ndate: {{date}}\narea: Other\n---\n\n" },
   ],
   tools: [],
-  startPage: canvasOf([40, 30, 560, "# Planning notebook\n\n- New lesson: **New from template → Lesson**\n- **Week plan** under Views shows lessons by week\n- Pupil notes are personal data: use **Lock** in the page header to encrypt a page with a password, and check your school's rules for where pupil notes may be stored"]),
+  startPage: canvasOf([40, 30, 560, "# Planning notebook\n\n- New work unit: **New from template → Work unit**, then tick its central content with **+** by *Central content*\n- **Lgr22 coverage** under Views shows what the units cover and what is still missing\n- New lesson: **New from template → Lesson**, and pick its work unit\n- Already plan in Lärarbordet? **Lärarbordet…** at the bottom left brings courses in, and sends them back\n- **Week plan** under Views shows lessons by week\n- Pupil notes are personal data: use **Lock** in the page header to encrypt a page with a password, and check your school's rules for where pupil notes may be stored"]),
 };
 
 const gameDesign: Kit = {

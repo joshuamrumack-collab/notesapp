@@ -4,6 +4,7 @@ import { lockText, sessionPasswords, unlockText } from "../lib/crypto";
 import type { Store } from "../lib/storage";
 import { CanvasPage } from "./CanvasPage";
 import { MarkdownPage } from "./MarkdownPage";
+import { t } from "../lib/i18n";
 
 /** Store wrapper: the locked file is decrypted on read and encrypted on write. Everything else passes through. */
 function lockedStore(store: Store, path: string, password: string, kind: "md" | "canvas"): Store {
@@ -60,12 +61,12 @@ export function LockedPage(props: PageProps & { onRemoveLock: (password: string)
             void tryOpen(typed, true);
           }}
         >
-          <strong>This page is locked.</strong>
-          <span className="muted">It is encrypted on disk. Type the password to open it.</span>
-          <input type="password" autoFocus value={typed} onChange={(e) => setTyped(e.target.value)} aria-label="Password" />
+          <strong>{t("This page is locked.")}</strong>
+          <span className="muted">{t("It is encrypted on disk. Type the password to open it.")}</span>
+          <input type="password" autoFocus value={typed} onChange={(e) => setTyped(e.target.value)} aria-label={t("Password")} />
           {error && <div className="error">{error}</div>}
           <button className="primary" disabled={busy || !typed}>
-            {busy ? "Opening…" : "Unlock"}
+            {busy ? t("Opening…") : t("Unlock")}
           </button>
         </form>
       </div>
@@ -76,9 +77,9 @@ export function LockedPage(props: PageProps & { onRemoveLock: (password: string)
   return (
     <>
       <div className="locked-bar">
-        <span>Locked page, open for this session. Images you add are stored unencrypted in _attachments.</span>
+        <span>{t("Locked page, open for this session. Images you add are stored unencrypted in _attachments.")}</span>
         <button className="quiet" onClick={() => props.onRemoveLock(password)}>
-          Remove lock
+          {t("Remove lock")}
         </button>
       </div>
       {kind === "canvas" ? <CanvasPage {...pageProps} /> : <MarkdownPage {...pageProps} />}

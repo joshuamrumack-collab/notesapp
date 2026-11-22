@@ -1,4 +1,6 @@
 import { type ReactNode, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+import { t } from "../lib/i18n";
 
 export function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
   useEffect(() => {
@@ -6,18 +8,20 @@ export function Modal({ title, onClose, children, wide }: { title: string; onClo
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
   }, [onClose]);
-  return (
+  // Drawn on top of the whole window, so it is not moved or cut by a zoomed canvas it was opened from.
+  return createPortal(
     <div className="modal-back" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className={"modal" + (wide ? " modal-wide" : "")} role="dialog" aria-label={title}>
         <div className="modal-head">
           <h2>{title}</h2>
-          <button className="quiet" onClick={onClose} aria-label="Close">
+          <button className="quiet" onClick={onClose} aria-label={t("Close")}>
             ×
           </button>
         </div>
         <div className="modal-body">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -72,10 +76,10 @@ export function PromptModal(props: {
         {error && <div className="error">{error}</div>}
         <div className="form-actions">
           <button type="button" onClick={props.onClose}>
-            Cancel
+            {t("Cancel")}
           </button>
           <button className="primary" type="submit" disabled={busy}>
-            {busy ? "Working…" : props.submit}
+            {busy ? t("Working…") : props.submit}
           </button>
         </div>
       </form>

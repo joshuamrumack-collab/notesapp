@@ -5,6 +5,7 @@ import { newCardText } from "../lib/cards";
 import { collectImages, saveImages } from "../lib/dropImages";
 import { orderPages, loadOrder, type OrderMap } from "../lib/order";
 import { type Entry, dirname, ext, join, stem } from "../lib/storage";
+import { t } from "../lib/i18n";
 
 const COVERS = ".notesapp/covers.json";
 const HIDDEN = new Set(["_attachments", "_trash", "node_modules"]);
@@ -86,7 +87,7 @@ export function Contents() {
   const setCover = async (section: string, files: File[] | DataTransfer) => {
     const src = files instanceof DataTransfer ? collectImages(files) : { files, urls: [] };
     const { saved, failed } = await saveImages(nb.store, src);
-    if (!saved[0]) return failed[0] && nb.notice(`Could not use that picture (${failed[0]}).`);
+    if (!saved[0]) return failed[0] && nb.notice(t("Could not use that picture ({0}).", failed[0]));
     nb.index.addFile(saved[0].path);
     const next = { ...covers, [section]: saved[0].path };
     setCovers(next);
@@ -95,8 +96,8 @@ export function Contents() {
 
   return (
     <div className="view">
-      <Header title={`${nb.store.rootName}: contents`}>
-        <span className="muted small">{nb.playerSafe ? "Player-safe: secret pages are hidden." : "Drop a picture on a cover to change it."}</span>
+      <Header title={t("{0}: contents", nb.store.rootName)}>
+        <span className="muted small">{nb.playerSafe ? t("Player-safe: secret pages are hidden.") : t("Drop a picture on a cover to change it.")}</span>
       </Header>
       <div className="view-body">
         <div className="covers">
@@ -106,7 +107,7 @@ export function Contents() {
         </div>
         {loose.length > 0 && (
           <section className="contents-loose">
-            <h3>Other pages</h3>
+            <h3>{t("Other pages")}</h3>
             <PageLinks pages={loose} />
           </section>
         )}
@@ -124,7 +125,7 @@ function PageLinks({ pages }: { pages: string[] }) {
           <button className="link" data-preview={nb.index.linkTo(p)} onClick={() => nb.openPath(p)}>
             {nb.index.cards.get(p)?.[0]?.title ?? stem(p)}
           </button>
-          {ext(p) === "map" && <span className="tag">map</span>}
+          {ext(p) === "map" && <span className="tag">{t("map")}</span>}
         </li>
       ))}
     </ul>
@@ -158,17 +159,17 @@ function Cover({ section, cover, onCover }: { section: Section; cover?: string; 
         }}
       >
         <h2>{section.name}</h2>
-        <button className="cover-btn" onClick={() => input.current?.click()} title="Choose a cover picture">
+        <button className="cover-btn" onClick={() => input.current?.click()} title={t("Choose a cover picture")}>
           ✎
         </button>
         <input ref={input} type="file" accept="image/*" hidden onChange={(e) => e.target.files && onCover(Array.from(e.target.files))} />
       </div>
       <div className="cover-body">
         <span className="muted small">
-          {total} {total === 1 ? "page" : "pages"}
+          {t("{0} pages", total)}
         </span>
         <PageLinks pages={section.pages.slice(0, 12)} />
-        {section.pages.length > 12 && <span className="muted small">and {section.pages.length - 12} more</span>}
+        {section.pages.length > 12 && <span className="muted small">{t("and {0} more", section.pages.length - 12)}</span>}
         {section.subs.map((s) => (
           <details key={s.path} className="toc-sub">
             <summary>
@@ -198,10 +199,10 @@ export function TagBrowser({ selected, onSelect }: { selected: string; onSelect:
   const shown = chosen ? [...new Set([...pages, ...withChildren])] : [];
   return (
     <div className="view">
-      <Header title="Tags" />
+      <Header title={t("Tags")} />
       <div className="view-body tags-view">
         <div className="tag-cloud">
-          {tags.size === 0 && <p className="muted">No tags yet. Add tags with “+ Tag” above a page, or type #something in the text.</p>}
+          {tags.size === 0 && <p className="muted">{t("No tags yet. Add tags with “+ Tag” above a page, or type #something in the text.")}</p>}
           {[...tags].map(([t, ps]) => (
             <button key={t} className={"tag-pill" + (t === chosen ? " selected" : "")} onClick={() => onSelect(t)} style={{ fontSize: Math.min(20, 12 + ps.length) }}>
               #{t} <span className="muted">{ps.length}</span>
@@ -211,14 +212,14 @@ export function TagBrowser({ selected, onSelect }: { selected: string; onSelect:
         {chosen && (
           <section>
             <h3>#{chosen}</h3>
-            {shown.length === 0 && <p className="muted">No pages have this tag.</p>}
+            {shown.length === 0 && <p className="muted">{t("No pages have this tag.")}</p>}
             <div className="tag-pages">
               {shown.map((p) => {
                 const info = nb.index.pages.get(p);
                 return (
                   <button key={p} className="tag-page" data-preview={nb.index.linkTo(p)} onClick={() => nb.openPath(p)}>
                     <strong>{nb.index.cards.get(p)?.[0]?.title ?? info?.title}</strong>
-                    <span className="muted small">{dirname(p) || "Loose pages"}</span>
+                    <span className="muted small">{dirname(p) || t("Loose pages")}</span>
                   </button>
                 );
               })}
@@ -257,11 +258,11 @@ export function ToWrite() {
   };
   return (
     <div className="view">
-      <Header title="To write">
-        <span className="muted small">Links to pages that do not exist yet, most mentioned first.</span>
+      <Header title={t("To write")}>
+        <span className="muted small">{t("Links to pages that do not exist yet, most mentioned first.")}</span>
       </Header>
       <div className="view-body">
-        {list.length === 0 && <p className="muted">Nothing waiting. When you link to a page you have not written yet, it shows up here.</p>}
+        {list.length === 0 && <p className="muted">{t("Nothing waiting. When you link to a page you have not written yet, it shows up here.")}</p>}
         <table className="view-table">
           <tbody>
             {list.map(({ target, from }) => (
@@ -270,7 +271,7 @@ export function ToWrite() {
                   <strong className="wikilink missing">{target}</strong>
                 </td>
                 <td className="small">
-                  Mentioned in{" "}
+                  {t("Mentioned in")}{" "}
                   {from.map((p, i) => (
                     <span key={p}>
                       {i > 0 && ", "}
@@ -282,8 +283,8 @@ export function ToWrite() {
                 </td>
                 <td className="todo-actions">
                   {nb.config.cardTypes.length > 0 && (
-                    <select value={types[target] ?? ""} onChange={(e) => setTypes({ ...types, [target]: e.target.value })} aria-label="Kind of page">
-                      <option value="">Plain page</option>
+                    <select value={types[target] ?? ""} onChange={(e) => setTypes({ ...types, [target]: e.target.value })} aria-label={t("Kind of page")}>
+                      <option value="">{t("Plain page")}</option>
                       {nb.config.cardTypes.map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.name}
@@ -292,7 +293,7 @@ export function ToWrite() {
                     </select>
                   )}
                   <button className="primary" onClick={() => void create(target, from).catch((e) => nb.notice(String(e)))}>
-                    Write it
+                    {t("Write it")}
                   </button>
                 </td>
               </tr>

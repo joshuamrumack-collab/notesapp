@@ -3,6 +3,7 @@ import { useNB } from "../context";
 import { type OnGroup, type OnNotebook, type OnSection, countPages } from "../lib/onenote";
 import { type ImportProgress, canImportOneNote, desktopOneNote, importNotebook, loadNotebooks } from "../lib/onenote-import";
 import { Modal } from "./Modal";
+import { t } from "../lib/i18n";
 
 function sectionIds(items: (OnSection | OnGroup)[]): string[] {
   return items.flatMap((it) => (it.kind === "section" ? (it.locked ? [] : [it.id]) : sectionIds(it.children)));
@@ -19,9 +20,9 @@ export function OneNoteImport({ onClose, onDone }: { onClose: () => void; onDone
 
   if (!canImportOneNote()) {
     return (
-      <Modal title="Import from OneNote" onClose={onClose}>
-        <p>OneNote import works in the desktop app on Windows, with the OneNote desktop app (the one in Microsoft Office) installed.</p>
-        <p className="muted">It asks OneNote for your notebooks directly, so nothing is uploaded and no sign-in is needed.</p>
+      <Modal title={t("Import from OneNote")} onClose={onClose}>
+        <p>{t("OneNote import works in the desktop app on Windows, with the OneNote desktop app (the one in Microsoft Office) installed.")}</p>
+        <p className="muted">{t("It asks OneNote for your notebooks directly, so nothing is uploaded and no sign-in is needed.")}</p>
       </Modal>
     );
   }
@@ -48,17 +49,17 @@ export function OneNoteImport({ onClose, onDone }: { onClose: () => void; onDone
               setChosen(next);
             }}
           />
-          {it.name} <span className="muted">({it.locked ? "password protected, unlock it in OneNote first" : `${it.pages.length} pages`})</span>
+          {it.name} <span className="muted">({it.locked ? t("password protected, unlock it in OneNote first") : t("{0} pages", it.pages.length)})</span>
         </label>
       ),
     );
 
   return (
-    <Modal title="Import from OneNote" onClose={busy ? () => {} : onClose} wide>
+    <Modal title={t("Import from OneNote")} onClose={busy ? () => {} : onClose} wide>
       {!books && (
         <div className="form">
-          <p>This reads notebooks from the OneNote desktop app on this PC. OneNote may open while it runs. Your OneNote notebooks are not changed.</p>
-          <p className="muted small">Kept: sections, section groups, pages and subpages, page order, where each text box sits, text formatting, lists, checkboxes, tables, images, links between pages. Not yet: handwriting, drawings, recordings, attached files, maths.</p>
+          <p>{t("This reads notebooks from the OneNote desktop app on this PC. OneNote may open while it runs. Your OneNote notebooks are not changed.")}</p>
+          <p className="muted small">{t("Kept: sections, section groups, pages and subpages, page order, where each text box sits, text formatting, lists, checkboxes, tables, images, links between pages. Not yet: handwriting, drawings, recordings, attached files, maths.")}</p>
           {error && <div className="error">{error}</div>}
           <div className="form-actions left">
             <button
@@ -70,20 +71,20 @@ export function OneNoteImport({ onClose, onDone }: { onClose: () => void; onDone
                 try {
                   setBooks(await loadNotebooks(desktopOneNote));
                 } catch (e) {
-                  setError(`Could not read from OneNote: ${e instanceof Error ? e.message : String(e)}`);
+                  setError(t("Could not read from OneNote: {0}", e instanceof Error ? e.message : String(e)));
                 } finally {
                   setBusy(false);
                 }
               }}
             >
-              {busy ? "Asking OneNote…" : "Find my OneNote notebooks"}
+              {busy ? t("Asking OneNote…") : t("Find my OneNote notebooks")}
             </button>
           </div>
         </div>
       )}
       {books && !book && (
         <div className="form">
-          {!books.length && <p>OneNote has no open notebooks. Open the notebook in OneNote first.</p>}
+          {!books.length && <p>{t("OneNote has no open notebooks. Open the notebook in OneNote first.")}</p>}
           {books.map((b) => (
             <button
               key={b.id}
@@ -94,7 +95,7 @@ export function OneNoteImport({ onClose, onDone }: { onClose: () => void; onDone
               }}
             >
               <strong>{b.name}</strong>
-              <span className="muted">{countPages(b.children)} pages</span>
+              <span className="muted">{t("{0} pages", countPages(b.children))}</span>
             </button>
           ))}
         </div>
@@ -102,12 +103,12 @@ export function OneNoteImport({ onClose, onDone }: { onClose: () => void; onDone
       {book && !progress && (
         <div className="form">
           <p>
-            Choose sections from <strong>{book.name}</strong>. They go into a new folder “{book.name}” in this notebook.
+            {t("Choose sections from {0}. They go into a new folder “{0}” in this notebook.", book.name)}
           </p>
           <div className="on-tree">{tree(book.children)}</div>
           {error && <div className="error">{error}</div>}
           <div className="form-actions">
-            <button onClick={() => setBook(null)}>Back</button>
+            <button onClick={() => setBook(null)}>{t("Back")}</button>
             <button
               className="primary"
               disabled={!chosen.size}
@@ -125,7 +126,7 @@ export function OneNoteImport({ onClose, onDone }: { onClose: () => void; onDone
                 }
               }}
             >
-              Import {chosen.size} {chosen.size === 1 ? "section" : "sections"}
+              {t("Import {0} sections", chosen.size)}
             </button>
           </div>
         </div>
@@ -134,7 +135,7 @@ export function OneNoteImport({ onClose, onDone }: { onClose: () => void; onDone
         <div className="form">
           <progress max={progress.total || 1} value={progress.done} />
           <p>
-            {progress.done} of {progress.total} pages {progress.current && <span className="muted">· {progress.current}</span>}
+            {t("{0} of {1} pages", progress.done, progress.total)} {progress.current && <span className="muted">· {progress.current}</span>}
           </p>
         </div>
       )}

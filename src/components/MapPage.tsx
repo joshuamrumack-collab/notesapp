@@ -9,6 +9,7 @@ import { type MapDoc, type Pin, parseMap, serializeMap } from "../lib/map";
 import { ext, stem } from "../lib/storage";
 import { PagePicker } from "./PagePicker";
 import { TagBar } from "./TagBar";
+import { t } from "../lib/i18n";
 
 const PIN_COLORS = ["#c0392b", "#1f7a6d", "#2f6fb5", "#a37a1b", "#6b4fa3", "#333333"];
 
@@ -68,7 +69,7 @@ export function MapPage({ store, path, onState, flushRef, onSaved }: PageProps) 
         imageCache.set(doc.image!, u);
         if (alive) setUrl(u);
       },
-      () => alive && setError(`The map picture ${doc.image} is missing.`),
+      () => alive && setError(t("The map picture {0} is missing.", doc.image ?? "")),
     );
     return () => {
       alive = false;
@@ -94,7 +95,7 @@ export function MapPage({ store, path, onState, flushRef, onSaved }: PageProps) 
     if (saved[0]) {
       nb.index.addFile(saved[0].path);
       change((d) => ({ ...d, image: saved[0].path }));
-    } else if (failed[0]) nb.notice(`Could not use that picture (${failed[0]}).`);
+    } else if (failed[0]) nb.notice(t("Could not use that picture ({0}).", failed[0]));
   };
 
   const zoomAt = (factor: number, cx: number, cy: number) =>
@@ -166,24 +167,24 @@ export function MapPage({ store, path, onState, flushRef, onSaved }: PageProps) 
   };
 
   if (error) return <div className="page-message">{error}</div>;
-  if (!doc) return <div className="page-message">Loading…</div>;
+  if (!doc) return <div className="page-message">{t("Loading…")}</div>;
   const parents = nb.index.parentMaps(path);
 
   return (
     <>
       <div className="page-toolbar">
         <div className="seg">
-          <button className={mode === "view" ? "selected" : ""} onClick={() => setMode("view")} title="Click pins to open their pages">
-            Explore
+          <button className={mode === "view" ? "selected" : ""} onClick={() => setMode("view")} title={t("Click pins to open their pages")}>
+            {t("Explore")}
           </button>
-          <button className={mode === "pin" ? "selected" : ""} disabled={!url} onClick={() => setMode("pin")} title="Click on the map to place a pin">
-            + Pin
+          <button className={mode === "pin" ? "selected" : ""} disabled={!url} onClick={() => setMode("pin")} title={t("Click on the map to place a pin")}>
+            {t("+ Pin")}
           </button>
-          <button className={mode === "edit" ? "selected" : ""} disabled={!doc.pins.length} onClick={() => setMode("edit")} title="Drag pins to move them, click one to change it">
-            Edit pins
+          <button className={mode === "edit" ? "selected" : ""} disabled={!doc.pins.length} onClick={() => setMode("edit")} title={t("Drag pins to move them, click one to change it")}>
+            {t("Edit pins")}
           </button>
         </div>
-        <button onClick={() => fileInput.current?.click()}>{doc.image ? "Change picture" : "Choose map picture"}</button>
+        <button onClick={() => fileInput.current?.click()}>{doc.image ? t("Change picture") : t("Choose map picture")}</button>
         <input
           ref={fileInput}
           type="file"
@@ -195,13 +196,13 @@ export function MapPage({ store, path, onState, flushRef, onSaved }: PageProps) 
           }}
         />
         <span className="seg">
-          <button onClick={() => frame.current && zoomAt(1 / 1.25, frame.current.clientWidth / 2, frame.current.clientHeight / 2)} aria-label="Zoom out">
+          <button onClick={() => frame.current && zoomAt(1 / 1.25, frame.current.clientWidth / 2, frame.current.clientHeight / 2)} aria-label={t("Zoom out")}>
             −
           </button>
-          <button onClick={fit} title="Fit the whole map">
-            Fit
+          <button onClick={fit} title={t("Fit the whole map")}>
+            {t("Fit")}
           </button>
-          <button onClick={() => frame.current && zoomAt(1.25, frame.current.clientWidth / 2, frame.current.clientHeight / 2)} aria-label="Zoom in">
+          <button onClick={() => frame.current && zoomAt(1.25, frame.current.clientWidth / 2, frame.current.clientHeight / 2)} aria-label={t("Zoom in")}>
             +
           </button>
         </span>
@@ -246,8 +247,8 @@ export function MapPage({ store, path, onState, flushRef, onSaved }: PageProps) 
       >
         {!url && (
           <div className="map-empty">
-            <strong>No map picture yet.</strong>
-            <span>Drop a picture here (from your files or a web page), or use “Choose map picture”.</span>
+            <strong>{t("No map picture yet.")}</strong>
+            <span>{t("Drop a picture here (from your files or a web page), or use “Choose map picture”.")}</span>
           </div>
         )}
         {url && (
@@ -266,12 +267,12 @@ export function MapPage({ store, path, onState, flushRef, onSaved }: PageProps) 
                     style={{ left: pin.x * natural.w, top: pin.y * natural.h, ["--pin" as string]: pin.color ?? PIN_COLORS[0], transform: `translate(-50%, -100%) scale(${1 / view.zoom})` }}
                     data-preview={target ?? undefined}
                     onPointerDown={(e) => startPinDrag(e, pin)}
-                    title={isMap ? "Opens a more detailed map" : ""}
+                    title={isMap ? t("Opens a more detailed map") : ""}
                   >
                     <span className="pin-label">{pin.label || (target ? linkLabel(pin.target!) : "Pin")}</span>
                     <span className="pin-dot">{isMap ? "▦" : ""}</span>
                     {mode === "edit" && (
-                      <button className="pin-x" onPointerDown={(e) => e.stopPropagation()} onClick={() => change((d) => ({ ...d, pins: d.pins.filter((x) => x.id !== pin.id) }))} aria-label="Remove pin">
+                      <button className="pin-x" onPointerDown={(e) => e.stopPropagation()} onClick={() => change((d) => ({ ...d, pins: d.pins.filter((x) => x.id !== pin.id) }))} aria-label={t("Remove pin")}>
                         ×
                       </button>
                     )}
@@ -285,7 +286,7 @@ export function MapPage({ store, path, onState, flushRef, onSaved }: PageProps) 
             {placing.pinId && (
               <div className="pin-colors">
                 {PIN_COLORS.map((c) => (
-                  <button key={c} style={{ background: c }} aria-label="Pin colour" onClick={() => patchPin(placing.pinId!, { color: c })} />
+                  <button key={c} style={{ background: c }} aria-label={t("Pin colour")} onClick={() => patchPin(placing.pinId!, { color: c })} />
                 ))}
               </div>
             )}
@@ -304,9 +305,9 @@ export function MapPage({ store, path, onState, flushRef, onSaved }: PageProps) 
         )}
       </div>
       <div className="map-hint muted small">
-        {mode === "view" && "Drag to move around, scroll to zoom. Click a pin to open its page; ▦ pins open a closer map."}
-        {mode === "pin" && "Click where the pin goes, then pick the page it links to (or make a new one, including a new map)."}
-        {mode === "edit" && "Drag pins to move them. Click a pin to change its page or colour, × removes it."}
+        {mode === "view" && t("Drag to move around, scroll to zoom. Click a pin to open its page; ▦ pins open a closer map.")}
+        {mode === "pin" && t("Click where the pin goes, then pick the page it links to (or make a new one, including a new map).")}
+        {mode === "edit" && t("Drag pins to move them. Click a pin to change its page or colour, × removes it.")}
       </div>
     </>
   );

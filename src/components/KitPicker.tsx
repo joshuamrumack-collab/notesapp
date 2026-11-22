@@ -1,7 +1,12 @@
 import { useState } from "react";
-import { type Kit, builtInKits, isKit } from "../lib/kits";
+import { type Kit, builtInKits as englishKits, isKit } from "../lib/kits";
+import { translateKit } from "../lib/i18n-kits";
+import { getLang } from "../lib/i18n";
+// Built-in kits in the interface language (ids and field keys are the same in every language).
+const builtIn = () => (getLang() === "sv" ? englishKits.map(translateKit) : englishKits);
 import { rememberKit, savedKits } from "../lib/notebook";
 import { Modal } from "./Modal";
+import { t } from "../lib/i18n";
 
 /** Choose a notebook type. Used when making a new notebook and from Notebook settings. */
 export function KitPicker(props: {
@@ -11,7 +16,7 @@ export function KitPicker(props: {
   onClose: () => void;
   allowNone?: boolean;
 }) {
-  const [kits, setKits] = useState<Kit[]>([...builtInKits, ...savedKits()]);
+  const [kits, setKits] = useState<Kit[]>([...builtIn(), ...savedKits()]);
   const [chosen, setChosen] = useState<Kit>(kits[0]);
   const [sections, setSections] = useState(props.emptyFolder);
   const [startPage, setStartPage] = useState(props.emptyFolder);
@@ -25,14 +30,14 @@ export function KitPicker(props: {
             <strong>{k.name}</strong>
             <span>{k.description}</span>
             <span className="muted small">
-              {k.cardTypes.map((c) => c.name).join(", ") || "No cards"}
+              {k.cardTypes.map((c) => c.name).join(", ") || t("No cards")}
               {k.tools.length ? " · " + k.tools.join(", ") : ""}
             </span>
           </button>
         ))}
         <label className="kit kit-load">
-          <strong>Load a kit file…</strong>
-          <span>A .kit.json file saved from another notebook.</span>
+          <strong>{t("Load a kit file…")}</strong>
+          <span>{t("A .kit.json file saved from another notebook.")}</span>
           <input
             type="file"
             accept=".json,application/json"
@@ -43,11 +48,11 @@ export function KitPicker(props: {
                 const kit = JSON.parse(await file.text());
                 if (!isKit(kit)) throw new Error("That file is not a notebook kit.");
                 rememberKit(kit);
-                setKits([...builtInKits, ...savedKits()]);
+                setKits([...builtIn(), ...savedKits()]);
                 setChosen(kit);
                 setError("");
               } catch (err) {
-                setError(err instanceof Error ? err.message : "Could not read that file.");
+                setError(err instanceof Error ? err.message : t("Could not read that file."));
               }
             }}
           />
@@ -56,15 +61,15 @@ export function KitPicker(props: {
       <div className="form">
         <label className="check">
           <input type="checkbox" checked={sections} onChange={(e) => setSections(e.target.checked)} />
-          Create the starter sections ({chosen.sections.join(", ") || "none"}). Existing folders are left as they are.
+          {t("Create the starter sections ({0}). Existing folders are left as they are.", chosen.sections.join(", ") || t("none"))}
         </label>
         <label className="check">
           <input type="checkbox" checked={startPage} onChange={(e) => setStartPage(e.target.checked)} />
-          Add a “Start here” page
+          {t("Add a “Start here” page")}
         </label>
         {error && <div className="error">{error}</div>}
         <div className="form-actions">
-          <button onClick={props.onClose}>{props.allowNone ? "Skip" : "Cancel"}</button>
+          <button onClick={props.onClose}>{props.allowNone ? t("Skip") : t("Cancel")}</button>
           <button
             className="primary"
             disabled={busy}
@@ -78,7 +83,7 @@ export function KitPicker(props: {
               }
             }}
           >
-            Use {chosen.name}
+            {t("Use {0}", chosen.name)}
           </button>
         </div>
       </div>

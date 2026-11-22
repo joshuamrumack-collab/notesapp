@@ -2,9 +2,11 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import { applyTheme, savedTheme } from "./lib/theme";
+import { getLang } from "./lib/i18n";
 
 // Before the first paint, so there is no flash of the wrong colours.
 applyTheme(savedTheme(), false);
+document.documentElement.lang = getLang();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>

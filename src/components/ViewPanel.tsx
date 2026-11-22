@@ -6,6 +6,9 @@ import type { FieldDef, ViewDef } from "../lib/kits";
 import { dirname } from "../lib/storage";
 import { linkLabel, singleLink } from "../lib/links";
 import type { JSX } from "react";
+import { t } from "../lib/i18n";
+import { Coverage } from "./Lgr22";
+import { RelationWeb } from "./RelationWeb";
 
 /** A field value; a [[link]] becomes a clickable page name. */
 function Value({ v, from }: { v: unknown; from: string }) {
@@ -16,14 +19,15 @@ function Value({ v, from }: { v: unknown; from: string }) {
     <button className="link value-link" onClick={() => {
       const hit = nb.index.resolve(target, from);
       if (hit) nb.openPath(hit);
-      else nb.notice(`There is no page called “${target}” yet.`);
+      else nb.notice(t("There is no page called “{0}” yet.", target));
     }}>
       {show(v)}
     </button>
   );
 }
 
-const raw = (v: unknown) => (v === true ? "✓" : v === false || v === null || v === undefined ? "" : String(v));
+const raw = (v: unknown) =>
+  v === true ? "✓" : v === false || v === null || v === undefined ? "" : Array.isArray(v) && v.some((x) => typeof x === "string" && x.includes("~")) ? t("{0} items", v.length) : Array.isArray(v) ? v.map(String).join(", ") : String(v);
 const show = (v: unknown) => linkLabel(raw(v));
 
 function isoWeek(d: Date): { year: number; week: number } {
@@ -67,15 +71,15 @@ export function ViewPanel({ view }: { view: ViewDef }) {
     <div className="view">
       <header className="page-header">
         <h1 className="view-title">{view.name}</h1>
-        <input className="view-filter" placeholder="Filter…" value={filter} onChange={(e) => setFilter(e.target.value)} />
+        <input className="view-filter" placeholder={t("Filter…")} value={filter} onChange={(e) => setFilter(e.target.value)} />
         <span className="muted small">
-          {cards.length} {type.name} {cards.length === 1 ? "card" : "cards"}
+          {t("{0} {1} cards", cards.length, type.name)}
         </span>
       </header>
       <div className="view-body">
         {!cards.length && (
           <div className="page-message">
-            No {type.name} cards yet. Add one with <b>+ Card… → {type.name}</b> on any page, or make a page a card from its properties.
+            {t("No {0} cards yet. Add one with + Card… → {0} on any page, or make a page a card from its properties.", type.name)}
           </div>
         )}
         {cards.length > 0 && view.kind === "table" && <CardTable cards={cards} fields={type.fields} />}
@@ -83,7 +87,9 @@ export function ViewPanel({ view }: { view: ViewDef }) {
         {cards.length > 0 && view.kind === "schedule" && field && <Schedule cards={cards} field={field} fields={type.fields} />}
         {cards.length > 0 && view.kind === "timeline" && field && <Timeline cards={cards} field={field} era={view.field2} fields={type.fields} />}
         {cards.length > 0 && view.kind === "tree" && field && <FamilyTree cards={cards} parents={field.key} partner={view.field2} />}
-        {cards.length > 0 && view.kind !== "table" && !field && <div className="page-message">This view needs a field to group by. Set it in Notebook settings → Views.</div>}
+        {cards.length > 0 && view.kind === "web" && field && <RelationWeb cards={cards} allies={field.key} enemies={view.field2} />}
+        {cards.length > 0 && view.kind === "coverage" && field && <Coverage cards={cards} field={field.key} />}
+        {cards.length > 0 && view.kind !== "table" && !field && <div className="page-message">{t("This view needs a field to group by. Set it in Notebook settings → Views.")}</div>}
       </div>
     </div>
   );
@@ -120,7 +126,7 @@ function CardTable({ cards, fields }: { cards: CardRef[]; fields: FieldDef[] }) 
         <tr>
           {head("", "Name")}
           {cols.map((c) => head(c.key, c.label))}
-          <th>Page</th>
+          <th>{t("Page")}</th>
         </tr>
       </thead>
       <tbody>
@@ -134,7 +140,7 @@ function CardTable({ cards, fields }: { cards: CardRef[]; fields: FieldDef[] }) 
                 <Value v={c.data[f.key]} from={c.path} />
               </td>
             ))}
-            <td className="muted">{dirname(c.path) || "Loose pages"}</td>
+            <td className="muted">{dirname(c.path) || t("Loose pages")}</td>
           </tr>
         ))}
       </tbody>
@@ -182,7 +188,7 @@ function Board({ cards, field, onMove, titleFields }: { cards: CardRef[]; field:
           }}
         >
           <div className="board-head">
-            {linkLabel(col) || `No ${field.label.toLowerCase()}`} <span className="muted">{values.filter((v) => v === col).length}</span>
+            {linkLabel(col) || t("No {0}", field.label.toLowerCase())} <span className="muted">{values.filter((v) => v === col).length}</span>
           </div>
           {cards
             .filter((c) => raw(c.data[field.key]) === col)
@@ -203,15 +209,15 @@ function Schedule({ cards, field, fields }: { cards: CardRef[]; field: FieldDef;
     .sort((a, b) => (a.d || "9999").localeCompare(b.d || "9999") || a.c.title.localeCompare(b.c.title));
   const groups = new Map<string, typeof dated>();
   for (const x of dated) {
-    let label = "No date";
+    let label = t("No date");
     if (/^\d{4}-\d{2}-\d{2}$/.test(x.d)) {
       const { year, week } = isoWeek(new Date(x.d + "T12:00:00"));
-      label = `Week ${week}, ${year}`;
+      label = t("Week {0}, {1}", week, year);
     }
     groups.set(label, [...(groups.get(label) ?? []), x]);
   }
   const now = isoWeek(new Date());
-  const thisWeek = `Week ${now.week}, ${now.year}`;
+  const thisWeek = t("Week {0}, {1}", now.week, now.year);
   const rest = fields.filter((f) => f.key !== field.key && f.type !== "long" && !["name", "title"].includes(f.key));
   return (
     <div className="schedule">
@@ -219,7 +225,7 @@ function Schedule({ cards, field, fields }: { cards: CardRef[]; field: FieldDef;
         <section key={label} className={"week" + (label === thisWeek ? " this-week" : "")}>
           <h3>
             {label}
-            {label === thisWeek && <span className="tag">this week</span>}
+            {label === thisWeek && <span className="tag">{t("this week")}</span>}
           </h3>
           {items.map(({ c, d }) => (
             <div key={c.path + (c.nodeId ?? "")} className="week-row">
@@ -261,7 +267,7 @@ function Timeline({ cards, field, era, fields }: { cards: CardRef[]; field: Fiel
     <div className="timeline">
       {items.map(({ c }) => {
         const e = era ? show(c.data[era]) : "";
-        const head = era && e !== lastEra ? <h3 className="era">{e || "No era"}</h3> : null;
+        const head = era && e !== lastEra ? <h3 className="era">{e || t("No era")}</h3> : null;
         lastEra = e;
         const when = c.data.when ?? c.data[field.key];
         return (
@@ -288,7 +294,7 @@ function Timeline({ cards, field, era, fields }: { cards: CardRef[]; field: Fiel
           </div>
         );
       })}
-      {missing > 0 && <p className="muted small">{missing} {missing === 1 ? "card has" : "cards have"} no {field.label.toLowerCase()} and {missing === 1 ? "is" : "are"} not shown.</p>}
+      {missing > 0 && <p className="muted small">{t("{0} cards have no {1} and are not shown.", missing, field.label.toLowerCase())}</p>}
     </div>
   );
 }
@@ -375,7 +381,7 @@ function FamilyTree({ cards, parents, partner }: { cards: CardRef[]; parents: st
   if (!inTree.length)
     return (
       <div className="page-message">
-        Nobody has family links yet. Open a character card and add <b>Parents</b> or <b>Partner</b> with the + button; the tree draws itself.
+        {t("Nobody has family links yet. Open a character card and add Parents or Partner with the + button; the tree draws itself.")}
       </div>
     );
   const { pos, parentsOf, partnersOf, width, height } = layoutTree(inTree);
@@ -421,7 +427,7 @@ function FamilyTree({ cards, parents, partner }: { cards: CardRef[]; parents: st
           </button>
         );
       })}
-      {alone > 0 && <p className="muted small tree-note">{alone} more without family links are not shown.</p>}
+      {alone > 0 && <p className="muted small tree-note">{t("{0} more without family links are not shown.", alone)}</p>}
     </div>
   );
 }

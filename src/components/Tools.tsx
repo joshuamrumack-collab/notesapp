@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNB } from "../context";
 import { type Roll, roll } from "../lib/dice";
+import { t } from "../lib/i18n";
 
 const history: Roll[] = [];
 
@@ -22,7 +23,7 @@ export function DiceRoller() {
   return (
     <div className="view">
       <header className="page-header">
-        <h1 className="view-title">Dice</h1>
+        <h1 className="view-title">{t("Dice")}</h1>
       </header>
       <div className="view-body tool">
         <form
@@ -32,18 +33,18 @@ export function DiceRoller() {
             go(expr);
           }}
         >
-          <input value={expr} onChange={(e) => setExpr(e.target.value)} aria-label="Dice to roll" autoFocus />
-          <button className="primary">Roll</button>
+          <input value={expr} onChange={(e) => setExpr(e.target.value)} aria-label={t("Dice to roll")} autoFocus />
+          <button className="primary">{t("Roll")}</button>
         </form>
         <div className="dice-quick">
           {["d4", "d6", "d8", "d10", "d12", "d20", "d100", "2d20kh1", "2d20kl1", "4d6kh3"].map((d) => (
-            <button key={d} onClick={() => go(d)} title={d.includes("kh1") ? "Advantage" : d.includes("kl1") ? "Disadvantage" : d === "4d6kh3" ? "Ability score" : ""}>
+            <button key={d} onClick={() => go(d)} title={d.includes("kh1") ? t("Advantage") : d.includes("kl1") ? t("Disadvantage") : d === "4d6kh3" ? t("Ability score") : ""}>
               {d}
             </button>
           ))}
         </div>
         {error && <div className="error">{error}</div>}
-        <p className="muted small">Examples: 2d6+3, d20-1, 4d6kh3 (keep highest 3), 2d20kl1 (keep lowest).</p>
+        <p className="muted small">{t("Examples: 2d6+3, d20-1, 4d6kh3 (keep highest 3), 2d20kl1 (keep lowest).")}</p>
         <div className="dice-log">
           {log.map((r, i) => (
             <div key={log.length - i} className={"dice-row" + (i === 0 ? " latest" : "")}>
@@ -76,7 +77,7 @@ const uid = () => Math.random().toString(36).slice(2, 9);
 
 export function Initiative() {
   const nb = useNB();
-  const [t, setT] = useState<Tracker | null>(null);
+  const [tr, setT] = useState<Tracker | null>(null);
   useEffect(() => {
     nb.store.readText(FILE).then(
       (s) => setT(JSON.parse(s) as Tracker),
@@ -85,88 +86,88 @@ export function Initiative() {
   }, [nb.store]);
   const save = (next: Tracker) => {
     setT(next);
-    nb.store.writeText(FILE, JSON.stringify(next, null, "\t") + "\n").catch((e) => nb.notice(String(e)));
+    nb.store.writeText(FILE, JSON.stringify(next, null, "\tr") + "\n").catch((e) => nb.notice(String(e)));
   };
   const fromCards = useMemo(
     () => nb.index.allCards().filter((c) => c.data.initiative !== undefined || c.type === "npc" || c.type === "monster"),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [nb.indexVer],
   );
-  if (!t) return <div className="page-message">Loading…</div>;
-  const set = (id: string, p: Partial<Combatant>) => save({ ...t, list: t.list.map((c) => (c.id === id ? { ...c, ...p } : c)) });
+  if (!tr) return <div className="page-message">{t("Loading…")}</div>;
+  const set = (id: string, p: Partial<Combatant>) => save({ ...tr, list: tr.list.map((c) => (c.id === id ? { ...c, ...p } : c)) });
   const sorted = (list: Combatant[]) => [...list].sort((a, b) => (b.init ?? -99) - (a.init ?? -99) || b.mod - a.mod);
-  const add = (name: string, mod = 0, hp = "") => save({ ...t, list: [...t.list, { id: uid(), name, mod, init: null, hp, note: "" }] });
+  const add = (name: string, mod = 0, hp = "") => save({ ...tr, list: [...tr.list, { id: uid(), name, mod, init: null, hp, note: "" }] });
   return (
     <div className="view">
       <header className="page-header">
-        <h1 className="view-title">Initiative</h1>
-        <span className="muted">Round {t.round}</span>
+        <h1 className="view-title">{t("Initiative")}</h1>
+        <span className="muted">Round {tr.round}</span>
       </header>
       <div className="view-body tool">
         <div className="init-actions">
-          <button onClick={() => save({ ...t, list: sorted(t.list.map((c) => ({ ...c, init: roll(`d20${c.mod >= 0 ? "+" : ""}${c.mod}`).total }))), turn: 0, round: 1 })}>
-            Roll all
+          <button onClick={() => save({ ...tr, list: sorted(tr.list.map((c) => ({ ...c, init: roll(`d20${c.mod >= 0 ? "+" : ""}${c.mod}`).total }))), turn: 0, round: 1 })}>
+            {t("Roll all")}
           </button>
-          <button onClick={() => save({ ...t, list: sorted(t.list) })}>Sort</button>
+          <button onClick={() => save({ ...tr, list: sorted(tr.list) })}>{t("Sort")}</button>
           <button
             className="primary"
-            disabled={!t.list.length}
+            disabled={!tr.list.length}
             onClick={() => {
-              const next = t.turn + 1;
-              save(next >= t.list.length ? { ...t, turn: 0, round: t.round + 1 } : { ...t, turn: next });
+              const next = tr.turn + 1;
+              save(next >= tr.list.length ? { ...tr, turn: 0, round: tr.round + 1 } : { ...tr, turn: next });
             }}
           >
-            Next turn
+            {t("Next turn")}
           </button>
-          <button onClick={() => save({ round: 1, turn: 0, list: [] })}>Clear</button>
+          <button onClick={() => save({ round: 1, turn: 0, list: [] })}>{t("Clear")}</button>
           <select
             value=""
-            aria-label="Add from a card"
+            aria-label={t("Add from a card")}
             onChange={(e) => {
               const c = fromCards.find((x) => x.path + (x.nodeId ?? "") === e.target.value);
               if (c) add(c.title, Number(c.data.initiative) || 0, c.data.hp !== undefined ? String(c.data.hp) : "");
             }}
           >
-            <option value="">+ From card…</option>
+            <option value="">{t("+ From card…")}</option>
             {fromCards.map((c) => (
               <option key={c.path + (c.nodeId ?? "")} value={c.path + (c.nodeId ?? "")}>
                 {c.title}
               </option>
             ))}
           </select>
-          <button onClick={() => add(`Combatant ${t.list.length + 1}`)}>+ Row</button>
+          <button onClick={() => add(t("Combatant {0}", tr.list.length + 1))}>{t("+ Row")}</button>
         </div>
         <table className="view-table init-table">
           <thead>
             <tr>
-              <th>Init</th>
-              <th>Name</th>
-              <th>Mod</th>
-              <th>HP</th>
-              <th>Note</th>
+              <th>{t("Init")}</th>
+              <th>{t("Name")}</th>
+              <th>{t("Mod")}</th>
+              <th>{t("HP")}</th>
+              <th>{t("Note")}</th>
               <th />
             </tr>
           </thead>
           <tbody>
-            {t.list.map((c, i) => (
-              <tr key={c.id} className={i === t.turn ? "current" : ""}>
+            {tr.list.map((c, i) => (
+              <tr key={c.id} className={i === tr.turn ? "current" : ""}>
                 <td>
-                  <input className="num" value={c.init ?? ""} onChange={(e) => set(c.id, { init: e.target.value === "" ? null : Number(e.target.value) || 0 })} aria-label="Initiative" />
+                  <input className="num" value={c.init ?? ""} onChange={(e) => set(c.id, { init: e.target.value === "" ? null : Number(e.target.value) || 0 })} aria-label={t("Initiative")} />
                 </td>
                 <td>
-                  <input value={c.name} onChange={(e) => set(c.id, { name: e.target.value })} aria-label="Name" />
+                  <input value={c.name} onChange={(e) => set(c.id, { name: e.target.value })} aria-label={t("Name")} />
                 </td>
                 <td>
-                  <input className="num" value={c.mod} onChange={(e) => set(c.id, { mod: Number(e.target.value) || 0 })} aria-label="Initiative bonus" />
+                  <input className="num" value={c.mod} onChange={(e) => set(c.id, { mod: Number(e.target.value) || 0 })} aria-label={t("Initiative bonus")} />
                 </td>
                 <td>
-                  <input className="num" value={c.hp} onChange={(e) => set(c.id, { hp: e.target.value })} aria-label="Hit points" />
+                  <input className="num" value={c.hp} onChange={(e) => set(c.id, { hp: e.target.value })} aria-label={t("Hit points")} />
                 </td>
                 <td>
-                  <input value={c.note} onChange={(e) => set(c.id, { note: e.target.value })} aria-label="Note" />
+                  <input value={c.note} onChange={(e) => set(c.id, { note: e.target.value })} aria-label={t("Note")} />
                 </td>
                 <td>
-                  <button className="quiet" onClick={() => save({ ...t, list: t.list.filter((x) => x.id !== c.id), turn: Math.min(t.turn, Math.max(0, t.list.length - 2)) })} aria-label="Remove">
+                  <button className="quiet" onClick={() => save({ ...tr, list: tr.list.filter((x) => x.id !== c.id), turn: Math.min(tr.turn, Math.max(0, tr.list.length - 2)) })} aria-label={t("Remove")}>
                     ×
                   </button>
                 </td>
@@ -174,7 +175,7 @@ export function Initiative() {
             ))}
           </tbody>
         </table>
-        {!t.list.length && <p className="muted">Add combatants with + Row, or pick NPCs and monsters from your cards.</p>}
+        {!tr.list.length && <p className="muted">{t("Add combatants with + Row, or pick NPCs and monsters from your cards.")}</p>}
       </div>
     </div>
   );

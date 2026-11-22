@@ -7,11 +7,14 @@ import { basename, join } from "../lib/storage";
 import type { Editor } from "@tiptap/core";
 import { bridge } from "../lib/bridge";
 import { CardFields } from "./CardFields";
+import { preserveMarkdown } from "../lib/mdPreserve";
 import { LinkButton, insertLink } from "./PagePicker";
 import { TagBar } from "./TagBar";
 import { propertyTags } from "../lib/links";
 import { type ImageSource, collectImages, mightHaveImages, saveImages } from "../lib/dropImages";
 import { RichText } from "./RichText";
+import { FormatBar } from "./FormatBar";
+import { t } from "../lib/i18n";
 
 /** A plain Markdown note shown as one full-width text box, with its properties on top. */
 export function MarkdownPage({ store, path, onState, flushRef, onSaved, noBackup }: PageProps) {
@@ -23,6 +26,8 @@ export function MarkdownPage({ store, path, onState, flushRef, onSaved, noBackup
   const original = useRef("");
   const frontRef = useRef("");
   const body = useRef("");
+  /** The body as it is in the file; unchanged blocks are written back exactly like this. */
+  const fileBody = useRef("");
   const backedUp = useRef(false);
   const editor = useRef<Editor | null>(null);
   const [dropping, setDropping] = useState(false);
@@ -32,7 +37,7 @@ export function MarkdownPage({ store, path, onState, flushRef, onSaved, noBackup
     const ed = editor.current;
     if (!ed) return;
     const pos = at ? ed.view.posAtCoords({ left: at.x, top: at.y })?.pos : undefined;
-    if (!src.files.length) nb.notice("Getting the image…");
+    if (!src.files.length) nb.notice(t("Getting the image…"));
     const { saved, failed } = await saveImages(store, src);
     if (saved.length) {
       for (const img of saved) nb.index.addFile(img.path);
@@ -40,7 +45,7 @@ export function MarkdownPage({ store, path, onState, flushRef, onSaved, noBackup
       if (pos !== undefined) ed.chain().focus().insertContentAt(pos, text).run();
       else ed.chain().focus().insertContent(text).run();
     }
-    nb.notice(failed.length ? `Could not add the image (${failed[0]}). Try right-click → Copy image in the browser, then paste here.` : "");
+    nb.notice(failed.length ? t("Could not add the image ({0}). Try right-click → Copy image in the browser, then paste here.", failed[0]) : "");
   };
 
   const { markDirty, flush } = useAutosave(async () => {
@@ -51,8 +56,10 @@ export function MarkdownPage({ store, path, onState, flushRef, onSaved, noBackup
       await store.writeText(join("_trash", "backups", `${basename(path)}.${stamp}.md`), original.current);
     }
     backedUp.current = true;
-    const text = frontRef.current + body.current.replace(/\s*$/, "\n");
+    const merged = preserveMarkdown(fileBody.current, body.current);
+    const text = frontRef.current + merged;
     await store.writeText(path, text);
+    fileBody.current = merged;
     onSaved?.(text);
   }, onState);
   flushRef.current = flush;
@@ -66,6 +73,7 @@ export function MarkdownPage({ store, path, onState, flushRef, onSaved, noBackup
         const parts = splitFrontmatter(src);
         frontRef.current = parts.front;
         body.current = parts.body;
+        fileBody.current = parts.body;
         setFront(parts.front);
         setInitialBody(parts.body);
         setLoaded(true);
@@ -84,7 +92,7 @@ export function MarkdownPage({ store, path, onState, flushRef, onSaved, noBackup
   };
 
   if (error) return <div className="page-message">{error}</div>;
-  if (!loaded) return <div className="page-message">Loading…</div>;
+  if (!loaded) return <div className="page-message">{t("Loading…")}</div>;
   return (
     <>
     <div className="page-toolbar">
@@ -97,8 +105,9 @@ export function MarkdownPage({ store, path, onState, flushRef, onSaved, noBackup
           insertLink(ed, nb.index.linkTo(path));
         }}
       />
-      <span className="muted small">Or type [[ in the text.</span>
+      <span className="muted small">{t("Or type [[ in the text.")}</span>
     </div>
+    <FormatBar />
     <div
       className={"md-scroll" + (dropping ? " dropping" : "")}
       onDragOverCapture={(e) => {
@@ -171,7 +180,7 @@ function Properties({ front, onChange, onError }: { front: string; onChange: (f:
       <div className="props-empty">
         <select
           value=""
-          aria-label="Make this page a card"
+          aria-label={t("Make this page a card")}
           onChange={(e) => {
             const t = nb.config.cardTypes.find((c) => c.id === e.target.value);
             if (!t) return;
@@ -180,7 +189,7 @@ function Properties({ front, onChange, onError }: { front: string; onChange: (f:
             onChange(makeFront(d));
           }}
         >
-          <option value="">Make this page a card…</option>
+          <option value="">{t("Make this page a card…")}</option>
           {nb.config.cardTypes.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
@@ -196,7 +205,7 @@ function Properties({ front, onChange, onError }: { front: string; onChange: (f:
     return (
       <div className="props" style={{ ["--card" as string]: type?.color }}>
         <div className="props-head">
-          <span>Properties (YAML)</span>
+          <span>{t("Properties (YAML)")}</span>
           <button
             disabled={!ok}
             onClick={() => {
@@ -204,11 +213,11 @@ function Properties({ front, onChange, onError }: { front: string; onChange: (f:
               setRaw(null);
             }}
           >
-            Done
+            {t("Done")}
           </button>
         </div>
         <textarea className="props-raw" rows={Math.max(4, raw.split("\n").length + 1)} value={raw} onChange={(e) => setRaw(e.target.value)} />
-        {!ok && <div className="error">This is not valid YAML yet, so it will not be saved.</div>}
+        {!ok && <div className="error">{t("This is not valid YAML yet, so it will not be saved.")}</div>}
       </div>
     );
   }
@@ -219,7 +228,7 @@ function Properties({ front, onChange, onError }: { front: string; onChange: (f:
       <div className="props-head">
         <span>{cardId ? (type?.name ?? cardId) + " card" : "Properties"}</span>
         <button className="quiet" onClick={() => setRaw(frontInner(front))}>
-          Edit as text
+          {t("Edit as text")}
         </button>
       </div>
       <CardFields type={type} data={data} onChange={set} />

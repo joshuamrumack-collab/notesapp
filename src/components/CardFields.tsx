@@ -6,6 +6,8 @@ import { linkLabel, singleLink } from "../lib/links";
 import { PagePicker } from "./PagePicker";
 import type { Data } from "../lib/frontmatter";
 import type { CardType, FieldDef } from "../lib/kits";
+import { t } from "../lib/i18n";
+import { Lgr22Input } from "./Lgr22";
 
 const asText = (v: unknown) => (v === null || v === undefined ? "" : String(v));
 
@@ -25,6 +27,8 @@ function FieldInput({ def, value, onChange }: { def: FieldDef; value: unknown; o
       return <LinkInput def={def} value={value} onChange={onChange} />;
     case "links":
       return <LinksInput def={def} value={value} onChange={onChange} />;
+    case "lgr22":
+      return <Lgr22Input def={def} value={value} onChange={onChange} />;
     case "check":
       return <input type="checkbox" checked={value === true} onChange={(e) => onChange(e.target.checked)} />;
     case "select": {
@@ -66,24 +70,24 @@ function LinkInput({ def, value, onChange }: { def: FieldDef; value: unknown; on
           type="button"
           data-preview={target}
           className={"link-chip" + (hit ? "" : " missing")}
-          title={hit ? `Open ${hit}` : "This page does not exist yet. Click to create it."}
+          title={hit ? t("Open {0}", hit) : t("This page does not exist yet. Click to create it.")}
           onClick={() => bridge.open(target, bridge.currentPath)}
         >
           {linkLabel(text)}
         </button>
       ) : text ? (
-        <span className="link-plain" title="Not linked yet">
+        <span className="link-plain" title={t("Not linked yet")}>
           {text}
           {plainHit && (
             <button type="button" className="quiet small" onClick={() => onChange(`[[${nb.index.linkTo(plainHit)}]]`)}>
-              link it
+              {t("link it")}
             </button>
           )}
         </span>
       ) : (
         <span className="muted link-none">–</span>
       )}
-      <button type="button" className="link-pick" aria-label={`Choose ${def.label}`} title={`Choose ${def.label.toLowerCase()}`} onClick={() => setOpen(!open)}>
+      <button type="button" className="link-pick" aria-label={t("Choose {0}", def.label)} title={t("Choose {0}", def.label.toLowerCase())} onClick={() => setOpen(!open)}>
         ▾
       </button>
       {open && (
@@ -122,14 +126,14 @@ function LinksInput({ def, value, onChange }: { def: FieldDef; value: unknown; o
               ) : (
                 <span>{v}</span>
               )}
-              <button type="button" className="chip-x" aria-label={`Remove ${linkLabel(v)}`} onClick={() => onChange(list.filter((_, j) => j !== i))}>
+              <button type="button" className="chip-x" aria-label={t("Remove {0}", linkLabel(v))} onClick={() => onChange(list.filter((_, j) => j !== i))}>
                 ×
               </button>
             </span>
           );
         })}
       </span>
-      <button type="button" className="link-pick" aria-label={`Add to ${def.label}`} title={`Add to ${def.label.toLowerCase()}`} onClick={() => setOpen(!open)}>
+      <button type="button" className="link-pick" aria-label={t("Add to {0}", def.label)} title={t("Add to {0}", def.label.toLowerCase())} onClick={() => setOpen(!open)}>
         +
       </button>
       {open && (

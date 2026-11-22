@@ -5,10 +5,14 @@ import { Markdown } from "@tiptap/markdown";
 import { TableKit } from "@tiptap/extension-table";
 import { TaskList, TaskItem } from "@tiptap/extension-list";
 import { NotebookImage, WikiLinks } from "./wikilinks";
+import { AlignedHeading, AlignedParagraph, formattingExtensions } from "./formatting";
 export { splitFrontmatter } from "./frontmatter";
 
 export const editorExtensions: Extensions = [
-  StarterKit.configure({ link: { openOnClick: false, autolink: false } }),
+  StarterKit.configure({ link: { openOnClick: false, autolink: false }, paragraph: false, heading: false }),
+  AlignedParagraph,
+  AlignedHeading,
+  ...formattingExtensions,
   TableKit,
   TaskList,
   TaskItem.configure({ nested: true }),

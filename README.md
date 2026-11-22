@@ -1,4 +1,4 @@
-# Notes App (working title)
+# DorkyNotes
 
 OneNote's free pages, Obsidian's plain folders, and notebooks that know what they are for.
 A notebook is a folder, a section is a subfolder, a page is a file: `.canvas` pages use the open
@@ -6,7 +6,7 @@ A notebook is a folder, a section is a subfolder, a page is a file: `.canvas` pa
 
 ## Install
 
-Run `Notes App_x.y.z_x64-setup.exe`. It installs for your Windows user only, no administrator rights needed.
+Run `DorkyNotes_x.y.z_x64-setup.exe`. It installs for your Windows user only, no administrator rights needed.
 Windows may say "Windows protected your PC" because the installer is not code-signed: click **More info → Run anyway**.
 
 ## Updates
@@ -120,3 +120,24 @@ npm run tauri build    # make an installer in src-tauri/target/release/bundle
 - `src-tauri/src/lib.rs` - file commands and the OneNote bridge for the desktop app
 
 `npm test` runs the unit tests.
+
+## New in 0.3.0
+
+- **Renamed to DorkyNotes.**
+- **Formatting bar** like Word or Google Docs: paragraph style, font, size, bold, italic, underline, strikethrough,
+  sub/superscript, text colour, highlight, alignment, lists, checklists, indent, tables, lines and clear formatting.
+  Highlight is saved as Obsidian's `==text==`; colour, size, font and alignment are saved as small HTML tags.
+- **Canvas**: undo/redo, arrows between boxes with labels, select several boxes, zoom, box height.
+- **Markdown is kept as written**: parts of a note you do not change are saved exactly as they were.
+- **Svenska / English** under Theme, with spell checking in the chosen language. New notebooks get Swedish card types.
+- **Page history**: earlier versions of each page, with restore.
+- **Share as website**: one HTML file with the pages players or pupils may see. Secret content is left out of the file.
+- **Session mode** for game masters: session page, initiative, dice and look-up on one screen.
+- **Relationship web**: allies and enemies drawn as a graph.
+- **Teacher planning with Lgr22**: work units and lessons linked to central content, a coverage view that shows gaps,
+  and a bridge to Lärarbordet (bring courses in, send them back). Pupils and grades are never read or copied.
+
+The curriculum catalogue (`public/lgr22-catalog.json.gz`) is Skolverket's central content, in the same form and with
+the same ids as Lärarbordet uses.
+
+Made by DorkTeach.

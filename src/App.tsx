@@ -7,6 +7,7 @@ import { LockedPage } from "./components/LockedPage";
 import { MarkdownPage } from "./components/MarkdownPage";
 import { PromptModal } from "./components/Modal";
 import { OneNoteImport } from "./components/OneNoteImport";
+import { ThemePicker } from "./components/ThemePicker";
 import { Settings } from "./components/Settings";
 import { DiceRoller, Initiative } from "./components/Tools";
 import { ViewPanel } from "./components/ViewPanel";
@@ -56,6 +57,7 @@ type Modal =
   | { kind: "onenote" }
   | { kind: "template"; template: string }
   | { kind: "lock" }
+  | { kind: "theme" }
   | null;
 
 const RECENT = "notesapp.recent";
@@ -557,6 +559,9 @@ export default function App() {
             <button className="link" onClick={() => setModal({ kind: "onenote" })} title={canImportOneNote() ? "" : "Needs the desktop app on Windows"}>
               Import OneNote
             </button>
+            <button className="link" onClick={() => setModal({ kind: "theme" })}>
+              Theme
+            </button>
             <button className="link" onClick={closeNotebook}>
               Close
             </button>
@@ -676,6 +681,7 @@ export default function App() {
           }}
         />
       )}
+      {modal?.kind === "theme" && <ThemePicker onClose={() => setModal(null)} />}
       {modal?.kind === "settings" && <Settings onClose={() => setModal(null)} onSave={saveSettings} onAddKit={() => setModal({ kind: "kit", empty: false, first: false })} />}
       {modal?.kind === "onenote" && (
         <OneNoteImport
@@ -744,6 +750,7 @@ export default function App() {
 }
 
 function Welcome({ onOpen, loading, notice }: { onOpen: (s: Store) => void; loading: string; notice: string }) {
+  const [themes, setThemes] = useState(false);
   const canOpen = isTauri || canPickFolderInBrowser;
   const recent = isTauri ? recentList() : [];
   const version = useAppVersion();
@@ -765,7 +772,11 @@ function Welcome({ onOpen, loading, notice }: { onOpen: (s: Store) => void; load
         <button disabled={!!loading} onClick={async () => onOpen(await makeDemo())}>
           Try the demo campaign
         </button>
+        <button className="quiet" onClick={() => setThemes(true)}>
+          Colour theme…
+        </button>
       </div>
+      {themes && <ThemePicker onClose={() => setThemes(false)} />}
       {loading && <p>{loading}</p>}
       {notice && <p className="error">{notice}</p>}
       {recent.length > 0 && (

@@ -1,6 +1,10 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import { applyTheme, savedTheme } from "./lib/theme";
+
+// Before the first paint, so there is no flash of the wrong colours.
+applyTheme(savedTheme(), false);
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>

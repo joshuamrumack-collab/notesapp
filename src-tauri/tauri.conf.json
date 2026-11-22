@@ -14,7 +14,9 @@
       {
         "title": "Notes App",
         "width": 1280,
-        "height": 800
+        "height": 800,
+        "minWidth": 900,
+        "minHeight": 560
       }
     ],
     "security": {

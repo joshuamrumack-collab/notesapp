@@ -1,5 +1,6 @@
 // Usage: npm run release 0.2.0
-// Sets the version everywhere, commits, tags and pushes. GitHub then builds the installer and publishes the update.
+// Sets the version everywhere, commits and pushes. GitHub sees the new version, builds the installer,
+// tags it and publishes the update.
 import { execSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 
@@ -15,7 +16,5 @@ edit("src-tauri/Cargo.toml", (s) => s.replace(/^version = "[^"]+"/m, `version = 
 const run = (cmd) => execSync(cmd, { stdio: "inherit" });
 run("git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml");
 run(`git commit -m "Release ${version}"`);
-run(`git tag v${version}`);
 run("git push");
-run(`git push origin v${version}`);
 console.log(`\nPushed v${version}. GitHub is building it now; the release appears in a few minutes.`);

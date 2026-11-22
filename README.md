@@ -21,8 +21,9 @@ Updates come from this repository's GitHub releases. To publish a new version:
 npm run release 0.2.0
 ```
 
-This sets the version, commits, tags and pushes. GitHub Actions (`.github/workflows/release.yml`) builds the
-installer, signs the update with the `TAURI_SIGNING_PRIVATE_KEY` repository secret and publishes the release.
+This sets the version, commits and pushes. When the version changes on `main`, GitHub Actions
+(`.github/workflows/release.yml`) builds the installer, signs the update with the `TAURI_SIGNING_PRIVATE_KEY`
+repository secret, tags it and publishes the release.
 Every installed copy then offers the update. Keep the private signing key safe: without it you cannot publish
 updates that installed copies will accept.
 

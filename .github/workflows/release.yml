@@ -1,10 +1,12 @@
-# Builds the Windows installer for every version tag (v0.2.0, v0.3.0, ...) and publishes it as a GitHub release.
-# The installed app reads latest.json from the newest release and offers the update.
+# Publishes a Windows release whenever the version in src-tauri/tauri.conf.json changes on main
+# (or when started by hand from the Actions tab). Installed copies read latest.json from the newest
+# release and offer the update. A version that already has a release is skipped.
 name: Release
 
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
+    paths: ["src-tauri/tauri.conf.json"]
   workflow_dispatch:
 
 permissions:
@@ -15,25 +17,56 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Read version
+        id: version
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          v=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          if gh release view "v$v" >/dev/null 2>&1; then
+            echo "Release v$v already exists, nothing to do."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check the signing key is set
+        if: steps.version.outputs.skip != 'true'
+        shell: bash
+        env:
+          KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "::error::Add the repository secret TAURI_SIGNING_PRIVATE_KEY (Settings > Secrets and variables > Actions)."
+            exit 1
+          fi
+
       - uses: actions/setup-node@v4
+        if: steps.version.outputs.skip != 'true'
         with:
           node-version: 22
           cache: npm
       - uses: dtolnay/rust-toolchain@stable
+        if: steps.version.outputs.skip != 'true'
       - uses: swatinem/rust-cache@v2
+        if: steps.version.outputs.skip != 'true'
         with:
           workspaces: "./src-tauri -> target"
       - run: npm ci
+        if: steps.version.outputs.skip != 'true'
       - run: npm test
+        if: steps.version.outputs.skip != 'true'
       - uses: tauri-apps/tauri-action@v0
+        if: steps.version.outputs.skip != 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "Notes App ${{ github.ref_name }}"
-          releaseBody: "To install: download the file ending in x64-setup.exe below and run it. If you already have Notes App, it updates itself: open it and click Update."
+          tagName: v__VERSION__
+          releaseName: "Notes App v__VERSION__"
+          releaseBody: "To install: download the file ending in x64-setup.exe below and run it. If you already have Notes App, it updates itself: open it and click Update and restart."
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true

@@ -1,0 +1,58 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Notes App",
+  "version": "0.1.0",
+  "identifier": "com.dorkteach.notesapp",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Notes App",
+        "width": 1280,
+        "height": 800
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "createUpdaterArtifacts": true,
+    "publisher": "DorkTeach",
+    "copyright": "DorkTeach",
+    "shortDescription": "Notes App",
+    "longDescription": "Free-canvas notes in plain folders, with notebook types for campaigns, teaching and game design.",
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEJCNkQyMkQ4OUZFRjM1OTYKUldTV05lK2YyQ0p0dTZkb0ZEbXpVQVdCNDhpRnlhRmY2b0F2MlZQQXV5eDNSK2R6WUhEUXNKTEUK",
+      "endpoints": [
+        "https://github.com/joshuamrumack-collab/notesapp/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
+}

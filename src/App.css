@@ -294,3 +294,6 @@ button.value-link { color: var(--accent); padding: 0; text-align: left; }
 .update-bar.error-bar { border-color: var(--danger); }
 .update-bar progress { width: 100%; }
 button.link.inline { padding: 0; color: var(--accent); }
+
+/* ---------- dropping images ---------- */
+.canvas-scroll.dropping, .md-scroll.dropping { outline: 3px dashed var(--accent); outline-offset: -6px; background: #f3faf8; }

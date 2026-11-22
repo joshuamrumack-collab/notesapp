@@ -5,14 +5,15 @@ import { type CanvasDoc, type CanvasNode, isImage, newId, parseCanvas, serialize
 import { newCardText } from "../lib/cards";
 import { frontData, setFrontField, splitFrontmatter } from "../lib/frontmatter";
 import type { CardType } from "../lib/kits";
-import { type Store, basename, freeName, join } from "../lib/storage";
+import { type Store, basename } from "../lib/storage";
+import { type ImageSource, collectImages, mightHaveImages, saveImages } from "../lib/dropImages";
 import { imageCache } from "../lib/bridge";
 import { CardFields } from "./CardFields";
 import { LinkButton, insertLink } from "./PagePicker";
 import { bridge } from "../lib/bridge";
 import { RichText } from "./RichText";
 
-export const ATTACHMENTS = "_attachments";
+export { ATTACHMENTS } from "../lib/dropImages";
 
 export function CanvasPage({ store, path, onState, flushRef, onSaved }: PageProps) {
   const nb = useNB();
@@ -76,19 +77,48 @@ export function CanvasPage({ store, path, onState, flushRef, onSaved }: PageProp
   const remove = (id: string) => change((ns) => ns.filter((n) => n.id !== id));
   const bottomOf = () => Math.max(0, ...(docRef.current?.nodes ?? []).map((n) => n.y + n.height));
 
-  const addImages = async (files: File[], x: number, y: number) => {
-    for (const file of files.filter((f) => f.type.startsWith("image/"))) {
-      const dot = file.name.lastIndexOf(".");
-      const base = (dot > 0 ? file.name.slice(0, dot) : file.name) || "image";
-      const extension = dot > 0 ? file.name.slice(dot + 1) : file.type.split("/")[1] || "png";
-      const name = await freeName(store, ATTACHMENTS, base, extension);
-      const rel = join(ATTACHMENTS, name);
-      await store.writeBytes(rel, new Uint8Array(await file.arrayBuffer()));
-      nb.index.addFile(rel);
-      const node: CanvasNode = { id: newId(), type: "file", file: rel, x, y, width: 400, height: 300 };
+  const [dropping, setDropping] = useState(false);
+
+  /** Save dropped or pasted images and put each one on the page as an image box. */
+  const addImages = async (src: ImageSource, x: number, y: number) => {
+    if (!src.files.length && !src.urls.length) return;
+    nb.notice(src.files.length ? "" : "Getting the image…");
+    const { saved, failed } = await saveImages(store, src);
+    for (const img of saved) {
+      nb.index.addFile(img.path);
+      const node: CanvasNode = { id: newId(), type: "file", file: img.path, x: Math.max(0, x), y: Math.max(0, y), width: 400, height: 300 };
       change((ns) => [...ns, node]);
       y += 320;
     }
+    nb.notice(failed.length ? `Could not add the image (${failed[0]}). Try right-click → Copy image in the browser, then paste here.` : "");
+  };
+
+  const dropHandlers = {
+    onDragOverCapture: (e: React.DragEvent) => {
+      if (!mightHaveImages(e.dataTransfer)) return;
+      e.preventDefault();
+      setDropping(true);
+    },
+    onDragLeave: (e: React.DragEvent) => {
+      if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropping(false);
+    },
+    // Capture, so a drop on a text box makes an image box instead of the editor pasting a web link.
+    onDropCapture: (e: React.DragEvent) => {
+      setDropping(false);
+      const src = collectImages(e.dataTransfer);
+      if (!src.files.length && !src.urls.length) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const rect = surface.current?.getBoundingClientRect();
+      void addImages(src, rect ? e.clientX - rect.left - 20 : 40, rect ? e.clientY - rect.top - 20 : bottomOf() + 30);
+    },
+    onPasteCapture: (e: React.ClipboardEvent) => {
+      const src = collectImages(e.clipboardData);
+      if (!src.files.length) return; // plain text or links: let the text box handle it
+      e.preventDefault();
+      e.stopPropagation();
+      void addImages({ files: src.files, urls: [] }, 40, bottomOf() + 30);
+    },
   };
 
   const addCard = (type: CardType) => {
@@ -158,22 +188,13 @@ export function CanvasPage({ store, path, onState, flushRef, onSaved }: PageProp
           multiple
           hidden
           onChange={(e) => {
-            void addImages(Array.from(e.target.files ?? []), 40, bottomOf() + 30);
+            void addImages({ files: Array.from(e.target.files ?? []), urls: [] }, 40, bottomOf() + 30);
             e.target.value = "";
           }}
         />
-        <span className="muted small">Click empty space to write. Paste or drop images.</span>
+        <span className="muted small">Click empty space to write. Drop or paste images, from your files or a web page.</span>
       </div>
-      <div
-        className="canvas-scroll"
-        onPaste={(e) => {
-          const files = Array.from(e.clipboardData.files);
-          if (files.some((f) => f.type.startsWith("image/"))) {
-            e.preventDefault();
-            void addImages(files, 40, bottom + 20);
-          }
-        }}
-      >
+      <div className={"canvas-scroll" + (dropping ? " dropping" : "")} {...dropHandlers}>
         <div
           ref={surface}
           className="canvas-surface"
@@ -185,12 +206,6 @@ export function CanvasPage({ store, path, onState, flushRef, onSaved }: PageProp
             const y = Math.max(0, e.nativeEvent.offsetY - 30);
             setFocusId(id);
             change((ns) => [...ns, { id, type: "text", text: "", x, y, width: 420, height: 40 }]);
-          }}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => {
-            e.preventDefault();
-            const rect = e.currentTarget.getBoundingClientRect();
-            void addImages(Array.from(e.dataTransfer.files), e.clientX - rect.left, e.clientY - rect.top);
           }}
         >
           {doc.nodes.length === 0 && <div className="canvas-hint">Click anywhere and start typing</div>}

@@ -7,3 +7,6 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <App />
   </React.StrictMode>,
 );
+
+// A drop outside a page must not make the window open the dropped file in place of the app.
+for (const type of ["dragover", "drop"]) window.addEventListener(type, (e) => e.preventDefault());

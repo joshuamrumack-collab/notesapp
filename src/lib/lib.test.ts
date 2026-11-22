@@ -275,3 +275,36 @@ describe("property links", async () => {
     expect(frontData(out).location).toBe("[[Town]]");
   });
 });
+
+describe("dropped images", async () => {
+  const { collectImages, imageUrlsFromHtml, saveImages, sniffExt } = await import("./dropImages");
+  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
+  const fakeTransfer = (data: Record<string, string>, files: File[] = []) =>
+    ({ files, types: [...Object.keys(data), ...(files.length ? ["Files"] : [])], getData: (t: string) => data[t] ?? "" }) as unknown as DataTransfer;
+  test("finds the image address in a browser drag", () => {
+    // Google Images style: the link goes to a page, the <img> is the picture.
+    const src = collectImages(fakeTransfer({ "text/uri-list": "https://example.com/page", "text/html": '<a href="https://example.com/page"><img src="https://cdn.example.com/cat.jpg?w=200" srcset="https://cdn.example.com/cat.jpg?w=200 1x, https://cdn.example.com/cat.jpg?w=800 2x"></a>' }));
+    expect(src.urls).toEqual(["https://cdn.example.com/cat.jpg?w=200", "https://cdn.example.com/cat.jpg?w=800"]);
+    expect(collectImages(fakeTransfer({ "text/uri-list": "https://x.org/a.png" })).urls).toEqual(["https://x.org/a.png"]);
+    expect(collectImages(fakeTransfer({ "text/plain": "just words" })).urls).toEqual([]);
+    expect(imageUrlsFromHtml("<p>no images</p>")).toEqual([]);
+  });
+  test("sniffs image types", () => {
+    expect(sniffExt(png)).toBe("png");
+    expect(sniffExt(new Uint8Array([0xff, 0xd8, 0xff, 0xe0]))).toBe("jpg");
+    expect(sniffExt(new TextEncoder().encode('<?xml version="1.0"?><svg xmlns="x"/>'))).toBe("svg");
+    expect(sniffExt(new TextEncoder().encode("<html>not an image"))).toBeNull();
+  });
+  test("saves a data: image and a file, refuses non-images", async () => {
+    const store = memoryStore("t");
+    const b64 = btoa(String.fromCharCode(...png));
+    const a = await saveImages(store, { files: [], urls: [`data:image/png;base64,${b64}`] });
+    expect(a.saved.map((s) => s.path)).toEqual(["_attachments/image.png"]);
+    const file = new File([png], "photo.PNG", { type: "image/png" });
+    const b = await saveImages(store, { files: [file], urls: ["https://never.used/x.png"] });
+    expect(b.saved.map((s) => s.name)).toEqual(["photo.png"]);
+    const c = await saveImages(store, { files: [], urls: ["data:image/png;base64," + btoa("hello")] });
+    expect(c.saved).toEqual([]);
+    expect(c.failed[0]).toContain("not an image");
+  });
+});

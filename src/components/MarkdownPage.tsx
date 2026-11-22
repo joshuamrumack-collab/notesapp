@@ -8,6 +8,7 @@ import type { Editor } from "@tiptap/core";
 import { bridge } from "../lib/bridge";
 import { CardFields } from "./CardFields";
 import { LinkButton, insertLink } from "./PagePicker";
+import { type ImageSource, collectImages, mightHaveImages, saveImages } from "../lib/dropImages";
 import { RichText } from "./RichText";
 
 /** A plain Markdown note shown as one full-width text box, with its properties on top. */
@@ -22,6 +23,23 @@ export function MarkdownPage({ store, path, onState, flushRef, onSaved, noBackup
   const body = useRef("");
   const backedUp = useRef(false);
   const editor = useRef<Editor | null>(null);
+  const [dropping, setDropping] = useState(false);
+
+  /** Save images and put ![[name]] where they were dropped (or at the cursor when pasted). */
+  const addImages = async (src: ImageSource, at: { x: number; y: number } | null) => {
+    const ed = editor.current;
+    if (!ed) return;
+    const pos = at ? ed.view.posAtCoords({ left: at.x, top: at.y })?.pos : undefined;
+    if (!src.files.length) nb.notice("Getting the image…");
+    const { saved, failed } = await saveImages(store, src);
+    if (saved.length) {
+      for (const img of saved) nb.index.addFile(img.path);
+      const text = saved.map((img) => `![[${img.name}]]`).join(" ");
+      if (pos !== undefined) ed.chain().focus().insertContentAt(pos, text).run();
+      else ed.chain().focus().insertContent(text).run();
+    }
+    nb.notice(failed.length ? `Could not add the image (${failed[0]}). Try right-click → Copy image in the browser, then paste here.` : "");
+  };
 
   const { markDirty, flush } = useAutosave(async () => {
     if (!loaded) return;
@@ -79,7 +97,32 @@ export function MarkdownPage({ store, path, onState, flushRef, onSaved, noBackup
       />
       <span className="muted small">Or type [[ in the text.</span>
     </div>
-    <div className="md-scroll">
+    <div
+      className={"md-scroll" + (dropping ? " dropping" : "")}
+      onDragOverCapture={(e) => {
+        if (!mightHaveImages(e.dataTransfer)) return;
+        e.preventDefault();
+        setDropping(true);
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropping(false);
+      }}
+      onDropCapture={(e) => {
+        setDropping(false);
+        const src = collectImages(e.dataTransfer);
+        if (!src.files.length && !src.urls.length) return;
+        e.preventDefault();
+        e.stopPropagation();
+        void addImages(src, { x: e.clientX, y: e.clientY });
+      }}
+      onPasteCapture={(e) => {
+        const src = collectImages(e.clipboardData);
+        if (!src.files.length) return;
+        e.preventDefault();
+        e.stopPropagation();
+        void addImages({ files: src.files, urls: [] }, null);
+      }}
+    >
       <div className="md-page">
         <Properties front={front} onChange={updateFront} onError={nb.notice} />
         <RichText

@@ -2,7 +2,8 @@
 import MiniSearch from "minisearch";
 import { parseCanvas } from "./canvas";
 import { type Data, frontData, splitFrontmatter } from "./frontmatter";
-import { extractLinks, linkTarget, propertyLinks } from "./links";
+import { LINK_RE, extractLinks, extractTags, linkTarget, propertyLinks, propertyTags } from "./links";
+import { parseMap } from "./map";
 import { type Store, basename, dirname, ext, stem, walk } from "./storage";
 
 export interface PageInfo {
@@ -13,6 +14,11 @@ export interface PageInfo {
   links: string[];
   data: Data;
   secret: boolean;
+  tags: string[];
+  /** The page's own text without card fields, for previews. */
+  summary: string;
+  /** First picture on the page, for previews and covers. */
+  image?: string;
 }
 
 export interface CardRef {
@@ -23,9 +29,9 @@ export interface CardRef {
   title: string;
 }
 
-export const PAGE_EXTS = ["md", "canvas", "locked"];
+export const PAGE_EXTS = ["md", "canvas", "map", "locked"];
 const lower = (s: string) => s.toLowerCase();
-const noExt = (p: string) => p.replace(/\.(md|canvas|locked)$/i, "");
+const noExt = (p: string) => p.replace(/\.(md|canvas|map|locked)$/i, "");
 
 function cardTitle(data: Data, fallback: string): string {
   for (const k of ["name", "title", "pupil"]) {
@@ -45,33 +51,56 @@ export function parsePage(path: string, content: string, templatesFolder: string
   const e = ext(path);
   const title = stem(path);
   const inTemplates = path === templatesFolder || path.startsWith(templatesFolder + "/");
-  const info: PageInfo = { path, title, ext: e, text: "", links: [], data: {}, secret: false };
+  const info: PageInfo = { path, title, ext: e, text: "", links: [], data: {}, secret: false, tags: [], summary: "" };
+  const firstEmbed = (t: string) => {
+    for (const m of t.matchAll(LINK_RE)) if (m[1] && /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i.test(m[2].split("|")[0])) return m[2].split("|")[0].trim();
+    return /!\[[^\]]*\]\(([^)\s]+)/.exec(t)?.[1];
+  };
   const cards: CardRef[] = [];
   if (e === "md") {
     const { front, body } = splitFrontmatter(content);
     info.data = frontData(front);
     info.text = body;
+    info.summary = body;
     info.links = [...extractLinks(body), ...propertyLinks(info.data)];
     info.secret = info.data.secret === true;
+    info.tags = [...propertyTags(info.data.tags), ...extractTags(body)];
+    info.image = firstEmbed(body);
     const type = info.data.card;
     if (typeof type === "string" && !inTemplates) cards.push({ path, type, data: info.data, title: cardTitle(info.data, title) });
   } else if (e === "canvas") {
     try {
       const doc = parseCanvas(content);
       const texts: string[] = [];
+      const bodies: string[] = [];
       const propLinks: string[] = [];
       for (const n of doc.nodes) {
         if (n.type !== "text" || typeof n.text !== "string") continue;
         const { front, body } = splitFrontmatter(n.text);
         const data = frontData(front);
         propLinks.push(...propertyLinks(data));
+        if (body.trim()) bodies.push(body.trim());
         texts.push(Object.values(data).filter((v) => typeof v === "string" || typeof v === "number").join(" ") + "\n" + body);
         if (typeof data.card === "string" && !inTemplates) {
           cards.push({ path, nodeId: n.id, type: data.card, data, title: cardTitle(data, firstHeading(body) || title) });
         }
       }
       info.text = texts.join("\n\n");
+      info.summary = bodies.join("\n\n");
       info.links = [...extractLinks(info.text), ...propLinks];
+      info.tags = [...propertyTags((doc as { tags?: unknown }).tags), ...extractTags(info.text)];
+      info.image = (doc.nodes.find((n) => n.type === "file" && typeof n.file === "string" && /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i.test(n.file))?.file as string | undefined) ?? firstEmbed(info.text);
+    } catch {
+      /* broken canvas: index the title only */
+    }
+  } else if (e === "map") {
+    try {
+      const m = parseMap(content);
+      info.text = m.pins.map((p) => p.label).join("\n");
+      info.summary = m.pins.length ? `Map with ${m.pins.length} ${m.pins.length === 1 ? "pin" : "pins"}: ${m.pins.map((p) => p.label).join(", ")}` : "Map";
+      info.links = m.pins.map((p) => (p.target ? extractLinks(p.target)[0] : "")).filter(Boolean);
+      info.tags = propertyTags(m.tags);
+      info.image = m.image;
     } catch {
       /* broken canvas: index the title only */
     }
@@ -84,6 +113,18 @@ export class NotebookIndex {
   pages = new Map<string, PageInfo>();
   cards = new Map<string, CardRef[]>();
   private ms: MiniSearch;
+  /** lower-case page name -> paths, rebuilt when pages change (makes link lookups fast). */
+  private byStem: Map<string, string[]> | null = null;
+  private stems() {
+    if (!this.byStem) {
+      this.byStem = new Map();
+      for (const p of this.pages.keys()) {
+        const k = lower(stem(p));
+        this.byStem.set(k, [...(this.byStem.get(k) ?? []), p]);
+      }
+    }
+    return this.byStem;
+  }
   constructor(public templatesFolder = "_templates") {
     this.ms = new MiniSearch({
       idField: "path",
@@ -122,6 +163,7 @@ export class NotebookIndex {
     this.ms.add({ path, title: info.title, text: info.text });
     this.pages.set(path, info);
     this.cards.set(path, cards);
+    this.byStem = null;
     if (!this.files.includes(path)) this.files.push(path);
   }
 
@@ -133,6 +175,7 @@ export class NotebookIndex {
     if (this.ms.has(path)) this.ms.discard(path);
     this.pages.delete(path);
     this.cards.delete(path);
+    this.byStem = null;
     this.files = this.files.filter((f) => f !== path);
   }
 
@@ -140,12 +183,12 @@ export class NotebookIndex {
   resolve(raw: string, from = ""): string | null {
     const t = lower(noExt(linkTarget(raw)));
     if (!t) return null;
-    const all = [...this.pages.keys()];
     if (t.includes("/")) {
+      const all = this.stems().get(t.slice(t.lastIndexOf("/") + 1)) ?? [];
       const hit = all.find((p) => lower(noExt(p)) === t) ?? all.find((p) => lower(noExt(p)).endsWith("/" + t));
       return hit ?? null;
     }
-    const matches = all.filter((p) => lower(stem(p)) === t);
+    const matches = [...(this.stems().get(t) ?? [])];
     if (!matches.length) return null;
     const here = dirname(from);
     return matches.find((p) => dirname(p) === here) ?? matches.sort((a, b) => a.length - b.length)[0];
@@ -226,6 +269,36 @@ export class NotebookIndex {
 
   allCards(): CardRef[] {
     return [...this.cards.values()].flat();
+  }
+
+  /** Every tag with the pages that use it. */
+  tags(): Map<string, string[]> {
+    const out = new Map<string, string[]>();
+    for (const p of this.pages.values()) {
+      for (const t of new Set(p.tags.map((x) => x.toLowerCase()))) out.set(t, [...(out.get(t) ?? []), p.path]);
+    }
+    return new Map([...out].sort((a, b) => a[0].localeCompare(b[0])));
+  }
+
+  /** Links to pages that do not exist yet ("placeholders"), with the pages that mention them. */
+  unwritten(): { target: string; from: string[] }[] {
+    const out = new Map<string, { target: string; from: Set<string> }>();
+    for (const p of this.pages.values()) {
+      if (p.path.startsWith(this.templatesFolder + "/")) continue;
+      for (const l of p.links) {
+        if (this.resolve(l, p.path) || this.resolveFile(l, p.path)) continue;
+        const key = l.toLowerCase();
+        const hit = out.get(key) ?? { target: l, from: new Set<string>() };
+        hit.from.add(p.path);
+        out.set(key, hit);
+      }
+    }
+    return [...out.values()].map((x) => ({ target: x.target, from: [...x.from].sort() })).sort((a, b) => b.from.length - a.from.length || a.target.localeCompare(b.target));
+  }
+
+  /** Maps that have a pin pointing at this page: "part of". */
+  parentMaps(path: string): string[] {
+    return this.backlinks(path).filter((p) => ext(p) === "map");
   }
 }
 

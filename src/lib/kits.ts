@@ -1,11 +1,11 @@
 // Notebook types ("kits"): starter sections, card types, views, templates and tools.
-export type FieldType = "text" | "number" | "select" | "date" | "long" | "check" | "link";
+export type FieldType = "text" | "number" | "select" | "date" | "long" | "check" | "link" | "links";
 export interface FieldDef {
   key: string;
   label: string;
   type: FieldType;
   options?: string[];
-  /** For "link" fields: only offer cards of this type (empty = any page). */
+  /** For "link" and "links" fields: only offer cards of this type (empty = any page). */
   target?: string;
 }
 export interface CardType {
@@ -15,13 +15,17 @@ export interface CardType {
   fields: FieldDef[];
   body?: string;
 }
-export type ViewKind = "table" | "board" | "schedule";
+export type ViewKind = "table" | "board" | "schedule" | "timeline" | "tree";
 export interface ViewDef {
   id: string;
   name: string;
+  /** Card type id, or "*" for every card that has the field (timelines). */
   cardType: string;
   kind: ViewKind;
-  field?: string; // board: group by this field; schedule: date field
+  /** board: group by; schedule: date field; timeline: when (year, date or "1247 AR"); tree: parents. */
+  field?: string;
+  /** timeline: era to group by; tree: partner. */
+  field2?: string;
 }
 export interface TemplateDef {
   name: string;
@@ -46,6 +50,24 @@ const f = (key: string, label: string, type: FieldType = "text", options?: strin
   options ? { key, label, type, options } : { key, label, type };
 /** A field that links to another page, picked from a list. */
 const link = (key: string, label: string, target = ""): FieldDef => ({ key, label, type: "link", target });
+/** Several links, e.g. a character's parents. */
+const links = (key: string, label: string, target = ""): FieldDef => ({ key, label, type: "links", target });
+
+/** Something that happened, for timelines. "Year" sorts it; "When" is shown as written (in-world dates are fine). */
+const eventCard = (who: string, where: string): CardType => ({
+  id: "event",
+  name: "Event",
+  color: "#5a6b8a",
+  fields: [
+    f("title", "Event"),
+    f("year", "Year", "number"),
+    f("when", "When"),
+    f("era", "Era"),
+    links("who", "Who", who),
+    link("where", "Where", where),
+  ],
+  body: "## What happened\n\n",
+});
 
 /** A canvas page made of text boxes laid out top to bottom. */
 function canvasOf(...boxes: [number, number, number, string][]): string {
@@ -66,8 +88,12 @@ const general: Kit = {
       color: "#2f6fb5",
       fields: [f("title", "Task"), f("status", "Status", "select", ["To do", "Doing", "Done"]), f("due", "Due", "date")],
     },
+    eventCard("", ""),
   ],
-  views: [{ id: "tasks", name: "Task board", cardType: "task", kind: "board", field: "status" }],
+  views: [
+    { id: "tasks", name: "Task board", cardType: "task", kind: "board", field: "status" },
+    { id: "timeline", name: "Timeline", cardType: "event", kind: "timeline", field: "year", field2: "era" },
+  ],
   templates: [{ name: "Meeting notes", ext: "md", content: "# {{title}}\n\n**Date:** {{date}}\n\n## Notes\n\n\n## Actions\n\n- [ ] \n" }],
   tools: [],
   startPage: canvasOf([40, 30, 520, "# Welcome to your notebook\n\nClick anywhere on a page and type. Make sections on the left and pages in the middle column.\n\n- Type `[[` to link to another page\n- Press **Ctrl+P** to jump to a page, **Ctrl+Shift+F** to search\n- Use **+ Card** above a page to add a task card"]),
@@ -102,7 +128,7 @@ const dungeonMaster: Kit = {
   id: "dungeon-master",
   name: "Dungeon Master",
   description: "Campaign notebook with NPC, monster, location, quest and item cards (Pathfinder 1e style stat block), a quest board, dice roller, initiative tracker and player-safe mode.",
-  sections: ["NPCs", "Players", "Locations", "Sessions", "Encounters", "Quests", "Items", "Lore"],
+  sections: ["NPCs", "Players", "Locations", "Maps", "Sessions", "Encounters", "Quests", "Items", "Lore", "History"],
   cardTypes: [
     {
       id: "npc",
@@ -120,6 +146,9 @@ const dungeonMaster: Kit = {
         f("ac", "AC", "number"),
         f("hp", "HP", "number"),
         f("initiative", "Init", "number"),
+        links("parents", "Parents", "npc"),
+        links("partner", "Partner", "npc"),
+        f("born", "Born (year)", "number"),
         f("secret", "Secret from players", "check"),
       ],
       body: statBlock,
@@ -173,6 +202,7 @@ const dungeonMaster: Kit = {
       color: "#2d6a8a",
       fields: [f("number", "Session", "number"), f("date", "Date", "date"), f("chapter", "Chapter")],
     },
+    eventCard("npc", "location"),
   ],
   views: [
     { id: "npcs", name: "NPC list", cardType: "npc", kind: "table" },
@@ -181,6 +211,8 @@ const dungeonMaster: Kit = {
     { id: "monsters", name: "Monsters", cardType: "monster", kind: "table" },
     { id: "locations", name: "Locations", cardType: "location", kind: "table" },
     { id: "sessions", name: "Session calendar", cardType: "session", kind: "schedule", field: "date" },
+    { id: "timeline", name: "World timeline", cardType: "event", kind: "timeline", field: "year", field2: "era" },
+    { id: "family", name: "Family tree", cardType: "npc", kind: "tree", field: "parents", field2: "partner" },
   ],
   templates: [
     { name: "NPC", ext: "md", content: "---\ncard: npc\nname: {{title}}\nrace: Human\nclass: \nlevel: 1\nattitude: Neutral\n---\n\n# {{title}}\n\n" + statBlock },
@@ -288,7 +320,12 @@ const gameDesign: Kit = {
       fields: [f("name", "Mechanic"), f("status", "Status", "select", ["Idea", "Prototype", "In game", "Cut"]), f("pillar", "Design pillar")],
       body: "## What the player does\n\n\n## Why it is fun\n\n\n## Open questions\n\n",
     },
-    { id: "character", name: "Character", color: "#a0522d", fields: [f("name", "Name"), f("role", "Role", "select", ["Player", "Enemy", "NPC", "Boss"]), link("level", "Appears in", "level")] },
+    {
+      id: "character",
+      name: "Character",
+      color: "#a0522d",
+      fields: [f("name", "Name"), f("role", "Role", "select", ["Player", "Enemy", "NPC", "Boss"]), link("level", "Appears in", "level"), links("parents", "Parents", "character"), links("partner", "Partner", "character")],
+    },
     { id: "level", name: "Level", color: "#3c6e47", fields: [f("name", "Level"), f("status", "Status", "select", ["Idea", "Blockout", "Art pass", "Done"]), f("order", "Order", "number")] },
     {
       id: "finding",
@@ -302,12 +339,15 @@ const gameDesign: Kit = {
         f("date", "Date", "date"),
       ],
     },
+    eventCard("character", "level"),
   ],
   views: [
     { id: "tasks", name: "Task board", cardType: "task", kind: "board", field: "status" },
     { id: "findings", name: "Playtest findings", cardType: "finding", kind: "board", field: "status" },
     { id: "mechanics", name: "Mechanics", cardType: "mechanic", kind: "table" },
     { id: "levels", name: "Levels", cardType: "level", kind: "board", field: "status" },
+    { id: "story", name: "Story timeline", cardType: "event", kind: "timeline", field: "year", field2: "era" },
+    { id: "family", name: "Character family tree", cardType: "character", kind: "tree", field: "parents", field2: "partner" },
   ],
   templates: [
     { name: "Mechanic", ext: "md", content: "---\ncard: mechanic\nname: {{title}}\nstatus: Idea\n---\n\n## What the player does\n\n\n## Why it is fun\n\n\n## Open questions\n\n" },

@@ -22,6 +22,8 @@ export function PagePicker(props: {
   onPick: (path: string) => void;
   onClose: () => void;
   onClear?: () => void;
+  /** Also offer to make a new map (for map pins). */
+  allowMap?: boolean;
 }) {
   const nb = useNB();
   const [q, setQ] = useState(props.initial ?? "");
@@ -59,6 +61,12 @@ export function PagePicker(props: {
 
   const canCreate = q.trim() && !options.some((o) => o.title.toLowerCase() === q.trim().toLowerCase());
   const total = options.length + (canCreate ? 1 : 0);
+
+  const createMap = async () => {
+    const { emptyMap, serializeMap } = await import("../lib/map");
+    const path = await nb.createPage(dirname(currentPage()), q.trim(), "map", serializeMap(emptyMap()));
+    props.onPick(path);
+  };
 
   const create = async () => {
     const title = q.trim();
@@ -121,6 +129,11 @@ export function PagePicker(props: {
         {canCreate && (
           <button className={"picker-row picker-new" + (active === options.length ? " active" : "")} onClick={() => choose(options.length)}>
             + New {type && !anyPage ? type.name.toLowerCase() : "page"} “{q.trim()}”
+          </button>
+        )}
+        {canCreate && props.allowMap && (
+          <button className="picker-row picker-new" onClick={() => void createMap().catch((e) => nb.notice(String(e)))}>
+            + New map “{q.trim()}”
           </button>
         )}
         {!total && <div className="empty">{type && !anyPage ? `No ${type.name} cards yet. Type a name to make one.` : "No pages found"}</div>}

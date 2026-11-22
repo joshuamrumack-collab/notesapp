@@ -6,7 +6,7 @@ import { Modal } from "./Modal";
 import { checkForUpdates, useAppVersion } from "./Updates";
 import { isTauri } from "../lib/storage";
 
-const FIELD_TYPES: FieldType[] = ["text", "number", "select", "date", "long", "check", "link"];
+const FIELD_TYPES: FieldType[] = ["text", "number", "select", "date", "long", "check", "link", "links"];
 const TOOLS: { id: ToolId; label: string }[] = [
   { id: "dice", label: "Dice roller" },
   { id: "initiative", label: "Initiative tracker" },
@@ -101,7 +101,7 @@ export function Settings({ onClose, onSave, onAddKit }: { onClose: () => void; o
                         </select>
                       </td>
                       <td>
-                        {f.type === "link" && (
+                        {(f.type === "link" || f.type === "links") && (
                           <select value={f.target ?? ""} onChange={(e) => setField(i, { target: e.target.value })} aria-label="Links to">
                             <option value="">Any page</option>
                             {c.cardTypes.map((t) => (
@@ -169,6 +169,7 @@ export function Settings({ onClose, onSave, onAddKit }: { onClose: () => void; o
                     </td>
                     <td>
                       <select value={v.cardType} onChange={(e) => setView(i, { cardType: e.target.value })}>
+                        {v.kind === "timeline" && <option value="*">Any card</option>}
                         {c.cardTypes.map((t) => (
                           <option key={t.id} value={t.id}>
                             {t.name}
@@ -181,14 +182,32 @@ export function Settings({ onClose, onSave, onAddKit }: { onClose: () => void; o
                         <option value="table">Table</option>
                         <option value="board">Board</option>
                         <option value="schedule">Schedule</option>
+                        <option value="timeline">Timeline</option>
+                        <option value="tree">Family tree</option>
                       </select>
                     </td>
                     <td>
                       {v.kind !== "table" && (
-                        <select value={v.field ?? ""} onChange={(e) => setView(i, { field: e.target.value })}>
-                          <option value="">–</option>
-                          {(vt?.fields ?? [])
-                            .filter((f) => (v.kind === "schedule" ? f.type === "date" : f.type !== "long"))
+                        <select value={v.field ?? ""} onChange={(e) => setView(i, { field: e.target.value })} aria-label={v.kind === "tree" ? "Parents field" : "Field"}>
+                          <option value="">{v.kind === "tree" ? "Parents…" : v.kind === "timeline" ? "When…" : "–"}</option>
+                          {(v.cardType === "*" ? c.cardTypes.flatMap((t) => t.fields) : (vt?.fields ?? []))
+                            .filter((f, j, all) => all.findIndex((x) => x.key === f.key) === j)
+                            .filter((f) =>
+                              v.kind === "schedule" ? f.type === "date" : v.kind === "tree" ? f.type === "links" || f.type === "link" : v.kind === "timeline" ? ["number", "date", "text"].includes(f.type) : f.type !== "long",
+                            )
+                            .map((f) => (
+                              <option key={f.key} value={f.key}>
+                                {f.label}
+                              </option>
+                            ))}
+                        </select>
+                      )}
+                      {(v.kind === "tree" || v.kind === "timeline") && (
+                        <select value={v.field2 ?? ""} onChange={(e) => setView(i, { field2: e.target.value || undefined })} aria-label={v.kind === "tree" ? "Partner field" : "Era field"}>
+                          <option value="">{v.kind === "tree" ? "Partner…" : "Era…"}</option>
+                          {(v.cardType === "*" ? c.cardTypes.flatMap((t) => t.fields) : (vt?.fields ?? []))
+                            .filter((f, j, all) => all.findIndex((x) => x.key === f.key) === j)
+                            .filter((f) => (v.kind === "tree" ? f.type === "links" || f.type === "link" : f.type === "text" || f.type === "select"))
                             .map((f) => (
                               <option key={f.key} value={f.key}>
                                 {f.label}

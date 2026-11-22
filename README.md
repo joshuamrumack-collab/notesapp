@@ -77,6 +77,18 @@ npm run tauri build    # make an installer in src-tauri/target/release/bundle
 - Settings: edit card types, fields and views; save the notebook's setup as a `.kit.json` file to reuse or share.
 - New from template: `{{title}}`, `{{date}}` and `{{time}}` are filled in.
 
+**Worldbuilding (inspired by World Anvil)**
+- Maps: "More… → Map" makes a map page. Drop in a picture, click "+ Pin" and pick the page the pin opens.
+  A pin can open another map (town inside region inside world); pages show "On the map: …".
+- Placeholders: a link to a page that does not exist yet is dashed. "To write" lists them all, most
+  mentioned first, with a button to write each one (as a plain page or as a card).
+- Hover over any link, link field or map pin for a preview: picture, card fields and the first lines.
+- Tags: "+ Tag" on any page, or type #tag in the text. "Tags" shows every tag and its pages.
+- Contents: every section as a book-style cover with its pages; drop a picture on a cover to change it.
+  With player-safe mode on, secret pages are left out, so you can show it to players.
+- Timelines: Event cards with a year (in-world years like "1247 AR" work), grouped by era.
+- Family trees: Parents and Partner fields on characters; the tree draws itself.
+
 **Locked pages**
 - "Lock" encrypts a page with a password (AES-256-GCM, key from PBKDF2-SHA256, 310,000 rounds).
   There is no way to recover a forgotten password. Images on a locked page are not encrypted.

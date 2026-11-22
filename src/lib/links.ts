@@ -63,3 +63,21 @@ export function singleLink(value: unknown): string | null {
   const m = /^\s*\[\[([^[\]\n]+?)\]\]\s*$/.exec(value);
   return m ? linkTarget(m[1]) : null;
 }
+
+// #tags in text (Obsidian style): letters, digits, _ - and / for nested tags; not only digits.
+const TAG_RE = /(^|[\s(,;])#([\p{L}\p{N}_][\p{L}\p{N}_/-]*)/gu;
+export function extractTags(text: string): string[] {
+  const out: string[] = [];
+  // Ignore code: `inline` and fenced blocks.
+  const clean = text.replace(/```[\s\S]*?```/g, " ").replace(/`[^`\n]*`/g, " ");
+  for (const m of clean.matchAll(TAG_RE)) if (!/^\d+$/.test(m[2])) out.push(m[2].replace(/\/$/, ""));
+  return out;
+}
+
+/** Tags from a "tags" property: a list, or a comma or space separated string. "#" is optional. */
+export function propertyTags(v: unknown): string[] {
+  const list = Array.isArray(v) ? v : typeof v === "string" ? v.split(/[,\s]+/) : [];
+  return list.filter((t): t is string => typeof t === "string").map((t) => t.trim().replace(/^#/, "")).filter(Boolean);
+}
+
+export { TAG_RE };

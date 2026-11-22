@@ -8,6 +8,8 @@ import type { Editor } from "@tiptap/core";
 import { bridge } from "../lib/bridge";
 import { CardFields } from "./CardFields";
 import { LinkButton, insertLink } from "./PagePicker";
+import { TagBar } from "./TagBar";
+import { propertyTags } from "../lib/links";
 import { type ImageSource, collectImages, mightHaveImages, saveImages } from "../lib/dropImages";
 import { RichText } from "./RichText";
 
@@ -124,6 +126,16 @@ export function MarkdownPage({ store, path, onState, flushRef, onSaved, noBackup
       }}
     >
       <div className="md-page">
+        <TagBar
+          tags={propertyTags(frontData(front).tags)}
+          onChange={(tags) => {
+            try {
+              updateFront(setFrontField(front, "tags", tags.length ? tags : undefined));
+            } catch (e) {
+              nb.notice(e instanceof Error ? e.message : String(e));
+            }
+          }}
+        />
         <Properties front={front} onChange={updateFront} onError={nb.notice} />
         <RichText
           initial={initialBody}
@@ -201,7 +213,7 @@ function Properties({ front, onChange, onError }: { front: string; onChange: (f:
     );
   }
 
-  const complex = Object.entries(data).filter(([k, v]) => k !== "card" && !isScalar(v));
+  const complex = Object.entries(data).filter(([k, v]) => k !== "card" && k !== "tags" && !isScalar(v) && !type?.fields.some((f) => f.key === k));
   return (
     <div className={"props" + (cardId ? " props-card" : "")} style={{ ["--card" as string]: type?.color }}>
       <div className="props-head">

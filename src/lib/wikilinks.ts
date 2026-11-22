@@ -8,7 +8,7 @@ import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import Suggestion, { type SuggestionProps } from "@tiptap/suggestion";
 import { bridge } from "./bridge";
 import { isImage } from "./canvas";
-import { LINK_RE, linkTarget } from "./links";
+import { LINK_RE, TAG_RE, linkTarget } from "./links";
 
 function imageWidget(src: string): HTMLElement {
   const wrap = document.createElement("span");
@@ -47,9 +47,26 @@ function decorate(doc: PMNode): DecorationSet {
         }
       } else {
         decos.push(Decoration.inline(from, from + 2, { class: "wikilink-bracket" }));
-        decos.push(Decoration.inline(from + 2, to - 2, { class: "wikilink", "data-target": linkTarget(raw), title: "Click to open" }));
+        const target = linkTarget(raw);
+        const exists = bridge.exists(target, bridge.currentPath);
+        decos.push(
+          Decoration.inline(from + 2, to - 2, {
+            class: "wikilink" + (exists ? "" : " missing"),
+            "data-target": target,
+            title: exists ? "" : "Not written yet. Click to create it.",
+          }),
+        );
         decos.push(Decoration.inline(to - 2, to, { class: "wikilink-bracket" }));
       }
+    }
+  });
+  doc.descendants((node, pos) => {
+    if (node.type.name === "codeBlock") return false;
+    if (!node.isText || !node.text || node.marks.some((m) => m.type.name === "code")) return;
+    for (const m of node.text.matchAll(TAG_RE)) {
+      if (/^\d+$/.test(m[2])) continue;
+      const from = pos + m.index + m[1].length;
+      decos.push(Decoration.inline(from, from + 1 + m[2].length, { class: "hashtag", "data-tag": m[2], title: "Show pages with this tag" }));
     }
   });
   return DecorationSet.create(doc, decos);
@@ -150,6 +167,11 @@ export const WikiLinks = Extension.create({
         props: {
           decorations: (state) => linkKey.getState(state),
           handleClick: (_view, _pos, event) => {
+            const tag = (event.target as HTMLElement | null)?.closest?.("[data-tag]") as HTMLElement | null;
+            if (tag) {
+              bridge.openTag(tag.dataset.tag ?? "");
+              return true;
+            }
             const t = (event.target as HTMLElement | null)?.closest?.("[data-target]") as HTMLElement | null;
             if (!t) return false;
             bridge.open(t.dataset.target ?? "", bridge.currentPath);

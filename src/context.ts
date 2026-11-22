@@ -13,6 +13,7 @@ export interface NB {
   /** A file was written outside the open editor (views, tools). Updates search and reloads the page if it is open. */
   changed: (path: string, content?: string) => void;
   notice: (msg: string) => void;
+  openTag: (tag: string) => void;
   /** Make a new page and return its path (does not open it). */
   createPage: (dir: string, title: string, ext: string, content: string) => Promise<string>;
 }

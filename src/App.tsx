@@ -10,8 +10,12 @@ import { OneNoteImport } from "./components/OneNoteImport";
 import { Settings } from "./components/Settings";
 import { DiceRoller, Initiative } from "./components/Tools";
 import { ViewPanel } from "./components/ViewPanel";
+import { MapPage } from "./components/MapPage";
+import { HoverPreview } from "./components/HoverPreview";
+import { Contents, TagBrowser, ToWrite } from "./components/Explore";
+import { emptyMap, parseMap, serializeMap } from "./lib/map";
 import { UpdateBanner, checkForUpdates, useAppVersion } from "./components/Updates";
-import { type NB, NotebookCtx } from "./context";
+import { type NB, NotebookCtx, useNB } from "./context";
 import type { SaveState } from "./lib/autosave";
 import { bridge, imageCache } from "./lib/bridge";
 import { parseCanvas, serializeCanvas } from "./lib/canvas";
@@ -88,6 +92,7 @@ export default function App() {
   const [notice, setNotice] = useState("");
   const [modal, setModal] = useState<Modal>(null);
   const [playerSafe, setPlayerSafe] = useState(false);
+  const [tag, setTag] = useState("");
   const [loading, setLoading] = useState("");
   const flushRef = useRef<(() => Promise<void>) | null>(null);
   const refresh = () => setTick((t) => t + 1);
@@ -224,6 +229,12 @@ export default function App() {
   useEffect(() => {
     if (!store) return;
     bridge.pageNames = () => index.titles();
+    bridge.exists = (target, from) => !!index.resolve(target, from) || !!index.resolveFile(target, from);
+    bridge.openTag = (t) =>
+      void guard(async () => {
+        setTag(t.toLowerCase());
+        setView("explore:tags");
+      });
     bridge.open = (target, from) => {
       const hit = index.resolve(target, from);
       if (hit) void openPath(hit);
@@ -262,7 +273,17 @@ export default function App() {
       for (const p of linking) {
         const src = await store.readText(p);
         let out = src;
-        if (ext(p) === "canvas") {
+        if (ext(p) === "map") {
+          const m = parseMap(src);
+          for (const pin of m.pins) {
+            if (!pin.target) continue;
+            const r = replaceLinks(pin.target, oldStem, name);
+            if (r.count && pin.label === oldStem) pin.label = name;
+            pin.target = r.text;
+            updated += r.count;
+          }
+          out = serializeMap(m);
+        } else if (ext(p) === "canvas") {
           const doc = parseCanvas(src);
           for (const n of doc.nodes) {
             if (typeof n.text !== "string") continue;
@@ -398,6 +419,12 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   });
 
+  const todoCountMemo = useMemo(
+    () => (store ? index.unwritten().length : 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [indexVer, store],
+  );
+
   // ---------- render ----------
   const updateBanner = <UpdateBanner beforeInstall={async () => void (await flushRef.current?.())} />;
   if (!store)
@@ -408,7 +435,8 @@ export default function App() {
       </>
     );
 
-  const nb: NB = { store, config, index, indexVer, playerSafe, openPath: (p) => void openPath(p), changed, notice: setNotice, createPage };
+  const nb: NB = { store, config, index, indexVer, playerSafe, openPath: (p) => void openPath(p), changed, notice: setNotice, createPage, openTag: (t) => bridge.openTag(t) };
+  const todoCount = todoCountMemo;
   const activeView = config.views.find((v) => v.id === view);
   const pageKey = `${page}#${reload}`;
   const pageProps = {
@@ -425,6 +453,7 @@ export default function App() {
   return (
     <NotebookCtx.Provider value={nb}>
       {updateBanner}
+      <HoverPreview />
       <div className={"app" + (playerSafe ? " player-safe" : "")}>
         <aside className="sections">
           <div className="notebook-name" title={store.rootPath ?? store.rootName}>
@@ -480,12 +509,23 @@ export default function App() {
                 <div className="side-label">Views</div>
                 {config.views.map((v) => (
                   <button key={v.id} className={"tree-row" + (view === v.id ? " selected" : "")} onClick={() => guard(async () => setView(v.id))}>
-                    <span className="twisty">{{ table: "▤", board: "▥", schedule: "▦" }[v.kind]}</span>
+                    <span className="twisty">{{ table: "▤", board: "▥", schedule: "▦", timeline: "┆", tree: "⑂" }[v.kind]}</span>
                     {v.name}
                   </button>
                 ))}
               </>
             )}
+            <div className="side-label">Explore</div>
+            <button className={"tree-row" + (view === "explore:contents" ? " selected" : "")} onClick={() => guard(async () => setView("explore:contents"))}>
+              <span className="twisty">❏</span>Contents
+            </button>
+            <button className={"tree-row" + (view === "explore:tags" ? " selected" : "")} onClick={() => guard(async () => setView("explore:tags"))}>
+              <span className="twisty">#</span>Tags
+            </button>
+            <button className={"tree-row" + (view === "explore:todo" ? " selected" : "")} onClick={() => guard(async () => setView("explore:todo"))}>
+              <span className="twisty">✎</span>To write
+              {todoCount > 0 && <span className="count">{todoCount}</span>}
+            </button>
             {config.tools.some((t) => t !== "player-safe") && <div className="side-label">Tools</div>}
             {config.tools.includes("dice") && (
               <button className={"tree-row" + (view === "tool:dice" ? " selected" : "")} onClick={() => guard(async () => setView("tool:dice"))}>
@@ -528,16 +568,35 @@ export default function App() {
             <button className="primary" onClick={newPage} title="Ctrl+N">
               + New page
             </button>
-            {templates.length > 0 && (
-              <select value="" onChange={(e) => e.target.value && setModal({ kind: "template", template: e.target.value })} aria-label="New page from template">
-                <option value="">From template…</option>
-                {templates.map((t) => (
-                  <option key={t} value={t}>
-                    {stem(t)}
-                  </option>
-                ))}
-              </select>
-            )}
+            <select
+              value=""
+              aria-label="Other kinds of page"
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "kind:md" || v === "kind:map")
+                  void guard(async () => {
+                    const isMap = v === "kind:map";
+                    const path = await createPage(section, isMap ? "New map" : "Untitled", isMap ? "map" : "md", isMap ? serializeMap(emptyMap()) : "");
+                    flushRef.current = null;
+                    setView("");
+                    setPage(path);
+                  });
+                else if (v) setModal({ kind: "template", template: v });
+              }}
+            >
+              <option value="">More…</option>
+              <option value="kind:md">Text page</option>
+              <option value="kind:map">Map</option>
+              {templates.length > 0 && (
+                <optgroup label="From template">
+                  {templates.map((t) => (
+                    <option key={t} value={t}>
+                      {stem(t)}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
           </div>
           <PageList
             items={ordered}
@@ -555,6 +614,9 @@ export default function App() {
             </div>
           )}
           {activeView && <ViewPanel key={activeView.id} view={activeView} />}
+          {view === "explore:contents" && <Contents />}
+          {view === "explore:tags" && <TagBrowser selected={tag} onSelect={setTag} />}
+          {view === "explore:todo" && <ToWrite />}
           {view === "tool:dice" && <DiceRoller />}
           {view === "tool:initiative" && <Initiative />}
           {!view && page && (
@@ -562,7 +624,7 @@ export default function App() {
               <header className="page-header">
                 <TitleInput key={page} value={stem(page)} onCommit={renamePage} />
                 <span className={"save save-" + saveState}>{{ saved: "Saved", dirty: "Editing…", saving: "Saving…", error: "Could not save" }[saveState]}</span>
-                {ext(page) !== "locked" && (
+                {["md", "canvas"].includes(ext(page)) && (
                   <button className="quiet" onClick={() => setModal({ kind: "lock" })} title="Encrypt this page with a password">
                     Lock
                   </button>
@@ -572,8 +634,10 @@ export default function App() {
                 </button>
                 <ConfirmButton key={"del" + page} label="Delete" onConfirm={deletePage} />
               </header>
+              <OnMaps path={page} />
               {ext(page) === "canvas" && <CanvasPage key={pageKey} {...pageProps} />}
               {ext(page) === "md" && <MarkdownPage key={pageKey} {...pageProps} />}
+              {ext(page) === "map" && <MapPage key={pageKey} {...pageProps} />}
               {ext(page) === "locked" && <LockedPage key={pageKey} {...pageProps} onRemoveLock={removeLock} />}
               {ext(page) !== "locked" && <Backlinks path={page} />}
             </>
@@ -785,6 +849,7 @@ function PageList(props: {
             <span className="page-title">{stem(entry.name)}</span>
             {ext(entry.name) === "md" && <span className="tag">text</span>}
             {ext(entry.name) === "locked" && <span className="tag">locked</span>}
+            {ext(entry.name) === "map" && <span className="tag">map</span>}
           </button>
         );
       })}
@@ -881,5 +946,29 @@ function ConfirmButton({ label, onConfirm }: { label: string; onConfirm: () => v
     <button className={armed ? "danger" : "quiet"} onClick={() => (armed ? onConfirm() : setArmed(true))} onBlur={() => setArmed(false)}>
       {armed ? "Really delete?" : label}
     </button>
+  );
+}
+
+/** "On the map: Region map" for pages that a map pin points to. */
+function OnMaps({ path }: { path: string }) {
+  const nb = useNB();
+  const maps = useMemo(
+    () => (ext(path) === "map" ? [] : nb.index.parentMaps(path)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [path, nb.indexVer],
+  );
+  if (!maps.length) return null;
+  return (
+    <div className="on-maps small">
+      On the map:{" "}
+      {maps.map((m, i) => (
+        <span key={m}>
+          {i > 0 && ", "}
+          <button className="link inline" data-preview={nb.index.linkTo(m)} onClick={() => nb.openPath(m)}>
+            {stem(m)}
+          </button>
+        </span>
+      ))}
+    </div>
   );
 }

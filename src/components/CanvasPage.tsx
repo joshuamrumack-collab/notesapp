@@ -10,6 +10,8 @@ import { type ImageSource, collectImages, mightHaveImages, saveImages } from "..
 import { imageCache } from "../lib/bridge";
 import { CardFields } from "./CardFields";
 import { LinkButton, insertLink } from "./PagePicker";
+import { TagBar } from "./TagBar";
+import { propertyTags } from "../lib/links";
 import { bridge } from "../lib/bridge";
 import { RichText } from "./RichText";
 
@@ -193,6 +195,15 @@ export function CanvasPage({ store, path, onState, flushRef, onSaved }: PageProp
           }}
         />
         <span className="muted small">Click empty space to write. Drop or paste images, from your files or a web page.</span>
+        <span className="toolbar-right">
+          <TagBar
+            tags={propertyTags((doc as { tags?: unknown }).tags)}
+            onChange={(tags) => {
+              setDoc((d) => (d ? { ...d, tags: tags.length ? tags : undefined } : d));
+              markDirty();
+            }}
+          />
+        </span>
       </div>
       <div className={"canvas-scroll" + (dropping ? " dropping" : "")} {...dropHandlers}>
         <div

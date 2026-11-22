@@ -6,6 +6,7 @@ import type { Store } from "./storage";
 
 export function defaultValue(f: FieldDef): unknown {
   if (f.type === "check") return false;
+  if (f.type === "links") return [];
   if (f.type === "select") return f.options?.[0] ?? "";
   return "";
 }
@@ -13,7 +14,7 @@ export function defaultValue(f: FieldDef): unknown {
 /** The text of a new card box: properties block plus the card type's body. */
 export function newCardText(type: CardType, extra: Data = {}): string {
   const data: Data = { card: type.id };
-  for (const f of type.fields) data[f.key] = f.key in extra ? extra[f.key] : f.type === "check" ? false : f.type === "select" ? "" : "";
+  for (const f of type.fields) data[f.key] = f.key in extra ? extra[f.key] : f.type === "check" ? false : f.type === "links" ? [] : "";
   return makeFront(data) + (type.body ? "\n" + type.body : "");
 }
 
@@ -25,6 +26,7 @@ export function coerce(f: FieldDef | undefined, raw: unknown): unknown {
     return Number.isFinite(n) ? n : raw;
   }
   if (f.type === "check") return raw === true || raw === "true";
+  if (f.type === "links") return Array.isArray(raw) ? raw : raw ? [raw] : [];
   return raw ?? "";
 }
 

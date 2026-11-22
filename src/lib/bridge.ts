@@ -7,6 +7,9 @@ export const bridge = {
   activeEditor: null as Editor | null,
   open: (_target: string, _from: string) => {},
   pageNames: (): string[] => [],
+  /** Does a [[link]] point at a page that exists? */
+  exists: (_target: string, _from: string): boolean => true,
+  openTag: (_tag: string) => {},
   imageUrl: async (_src: string, _from: string): Promise<string | null> => null,
 };
 

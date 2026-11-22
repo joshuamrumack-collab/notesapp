@@ -52,7 +52,16 @@ export async function applyKit(store: Store, kit: Kit, base: NotebookConfig, opt
     ...base,
     kit: kit.id,
     kitName: kit.name,
-    cardTypes: [...base.cardTypes, ...kit.cardTypes.filter((c) => !have.has(c.id))],
+    // Card types you already have keep your changes; fields the kit has added since are appended.
+    cardTypes: [
+      ...base.cardTypes.map((c) => {
+        const k = kit.cardTypes.find((x) => x.id === c.id);
+        if (!k) return c;
+        const keys = new Set(c.fields.map((f) => f.key));
+        return { ...c, fields: [...c.fields, ...k.fields.filter((f) => !keys.has(f.key))] };
+      }),
+      ...kit.cardTypes.filter((c) => !have.has(c.id)),
+    ],
     views: [...base.views, ...kit.views.filter((v) => !haveViews.has(v.id))],
     tools: [...new Set([...base.tools, ...kit.tools])],
   };
